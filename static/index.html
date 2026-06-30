@@ -148,12 +148,39 @@
   <div class="tab-content" id="tab-upload" style="display:none">
     <div class="card">
       <div class="card-title"><span class="icon">📸</span> 上传视角图</div>
-      <p style="color:var(--ink-light);font-size:0.9rem;line-height:1.6">
-        上传功能需要后端服务支持。当前为静态展示版本，如需上传视角图，请联系管理员。
-      </p>
-      <div style="margin-top:20px;padding:16px;background:var(--accent-soft);border-radius:12px;font-size:0.85rem;color:var(--accent)">
-        💡 你可以查看已有的视角图，或联系管理员添加新的视角数据。
+      <div class="form-group">
+        <label class="form-label">场馆</label>
+        <input class="form-input" id="up-venue" value="KSPO DOME" readonly>
       </div>
+      <div class="form-group">
+        <label class="form-label">区域 *</label>
+        <input class="form-input" id="up-area" placeholder="如：7区、32区">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label class="form-label">排</label>
+          <input class="form-input" id="up-row" placeholder="如：10">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">座位号</label>
+          <input class="form-input" id="up-seat" placeholder="如：4">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">视角描述</label>
+        <textarea class="form-input" id="up-desc" rows="2" placeholder="简单描述视角感受"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">选择图片 *</label>
+        <input type="file" class="form-input" id="up-file" accept="image/*" style="padding:10px">
+        <div id="up-preview" style="margin-top:10px;display:none">
+          <img id="up-img" style="max-width:100%;border-radius:12px;border:2px solid var(--border)">
+        </div>
+      </div>
+      <button class="btn-submit" id="up-btn" onclick="doUpload()" style="width:100%;margin-top:10px">
+        📤 上传视角
+      </button>
+      <div id="up-status" style="margin-top:12px;font-size:0.85rem;color:var(--green);display:none"></div>
     </div>
   </div>
   <div class="bottom-nav">
