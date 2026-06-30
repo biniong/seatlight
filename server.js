@@ -337,6 +337,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ===== 邀请码验证 =====
+  if (pathname === '/api/invite/check' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { code } = JSON.parse(body || '{}');
+        const valid = code === CONFIG.inviteCode;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: valid }));
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'invalid_request' }));
+      }
+    });
+    return;
+  }
+
   // ===== 静态文件（frontend 优先，然后 static） =====
   if (req.method === 'GET' && !pathname.startsWith('/api/') && !pathname.startsWith('/img/') && !pathname.startsWith('/auth/')) {
     let fileUrl = pathname === '/' ? '/index.html' : pathname;

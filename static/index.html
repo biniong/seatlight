@@ -81,9 +81,29 @@
     .dropdown-item:hover { background: var(--paper); }
     .dropdown-item:last-child { border-bottom: none; }
     .star { color: var(--accent); }
+    /* Invite Code Modal */
+    .invite-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .invite-overlay.hidden { display: none; }
+    .invite-modal { background: var(--card-bg); border: 2px solid var(--border); border-radius: 255px 15px 225px 15px / 15px 225px 15px 225px; padding: 32px 28px; max-width: 360px; width: 100%; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+    .invite-modal h3 { font-size: 1.1rem; margin-bottom: 8px; color: var(--ink); }
+    .invite-modal p { font-size: 0.82rem; color: var(--ink-light); margin-bottom: 20px; line-height: 1.5; }
+    .invite-modal .form-input { text-align: center; font-size: 1rem; letter-spacing: 0.1em; margin-bottom: 16px; }
+    .invite-modal .btn-submit { width: 100%; }
+    .invite-error { color: var(--accent); font-size: 0.82rem; margin-top: 10px; display: none; }
   </style>
 </head>
 <body>
+<!-- 邀请码弹窗 -->
+<div class="invite-overlay" id="inviteOverlay">
+  <div class="invite-modal">
+    <div style="font-size:2rem;margin-bottom:12px">🎟️</div>
+    <h3>请输入邀请码</h3>
+    <p>当前为试点阶段，请输入邀请码后继续使用 SeatLight</p>
+    <input class="form-input" id="inviteCode" placeholder="请输入邀请码" autocomplete="off">
+    <button class="btn-submit" onclick="checkInviteCode()"> 验证</button>
+    <div class="invite-error" id="inviteError">邀请码错误，请重试</div>
+  </div>
+</div>
 <div class="app-container">
   <div class="header">
     <div class="logo-row">
@@ -430,6 +450,59 @@ function selectZone(zone) {
   }).join('');
 
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ===== 邀请码验证 =====
+(function() {
+  var overlay = document.getElementById('inviteOverlay');
+  var input = document.getElementById('inviteCode');
+  var error = document.getElementById('inviteError');
+
+  // 如果已经验证过，直接隐藏
+  if (localStorage.getItem('inviteVerified') === '1') {
+    overlay.classList.add('hidden');
+    return;
+  }
+
+  // 回车提交
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') checkInviteCode();
+  });
+})();
+
+function checkInviteCode() {
+  var code = document.getElementById('inviteCode').value.trim();
+  var errorEl = document.getElementById('inviteError');
+  var btn = document.querySelector('.invite-modal .btn-submit');
+
+  if (!code) { errorEl.textContent = '请输入邀请码'; errorEl.style.display = 'block'; return; }
+
+  btn.disabled = true;
+  btn.textContent = '验证中...';
+  errorEl.style.display = 'none';
+
+  fetch('/api/invite/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code })
+  }).then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        localStorage.setItem('inviteVerified', '1');
+        document.getElementById('inviteOverlay').classList.add('hidden');
+      } else {
+        errorEl.textContent = '邀请码错误，请重试';
+        errorEl.style.display = 'block';
+      }
+    })
+    .catch(function() {
+      errorEl.textContent = '网络错误，请重试';
+      errorEl.style.display = 'block';
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = '✅ 验证';
+    });
 }
 </script>
 </body>
