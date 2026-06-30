@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SeatLight · 首尔演唱会座位视角</title>
+  <style>
+    :root {
+      --ink: #2c2c2c; --ink-light: #666; --muted: #999;
+      --paper: #faf8f0; --card-bg: #fffef9;
+      --accent: #e87d5e; --accent-soft: #fce4db;
+      --green: #6b9080; --green-soft: #e8f0ec;
+      --blue: #5e7fbf; --blue-soft: #e4ecfa;
+      --yellow: #e8c56d; --yellow-soft: #faf3e0;
+      --purple: #8b7ec8; --purple-soft: #ece8f8;
+      --tag-bg: #f0e8d8; --border: #d4c9b8;
+      --shadow: 0 2px 12px rgba(44,44,44,0.06);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: 'KaiTi', 'STKaiti', '楷体', 'Georgia', 'Noto Serif SC', serif;
+      background: var(--paper); color: var(--ink);
+      min-height: 100vh; line-height: 1.7;
+      background-image:
+        radial-gradient(circle at 10% 15%, rgba(232,125,94,0.035) 0%, transparent 50%),
+        radial-gradient(circle at 90% 85%, rgba(107,144,128,0.035) 0%, transparent 50%);
+    }
+    .app-container { max-width: 480px; margin: 0 auto; padding: 16px 16px 80px; position: relative; z-index: 1; }
+    .header { text-align: center; padding: 36px 0 20px; }
+    .logo-row { display: inline-flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 44px; height: 44px; }
+    .logo-text { font-size: 1.55rem; font-weight: 700; letter-spacing: 0.06em; position: relative; line-height: 1.2; }
+    .logo-text span::after { content: ''; position: absolute; bottom: 1px; left: -2px; right: -2px; height: 4px; background: var(--accent); border-radius: 2px; opacity: 0.35; transform: rotate(-0.8deg); }
+    .header-subtitle { font-size: 0.82rem; color: var(--ink-light); margin-top: 6px; }
+    .badge-seoul { display: inline-block; font-size: 0.7rem; padding: 2px 10px; background: var(--blue-soft); color: var(--blue); border-radius: 20px; font-weight: 600; margin-top: 4px; }
+    .card { background: var(--card-bg); border: 2px solid var(--border); padding: 22px; margin-bottom: 18px; box-shadow: var(--shadow); border-radius: 255px 15px 225px 15px / 15px 225px 15px 225px; }
+    .card-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--paper); padding: 4px; border: 2px solid var(--border); border-radius: 255px 15px 225px 15px / 15px 225px 15px 225px; }
+    .tab { flex: 1; padding: 10px 12px; text-align: center; font-size: 0.88rem; font-family: inherit; font-weight: 600; border: none; background: transparent; cursor: pointer; border-radius: 30px; color: var(--ink-light); transition: all 0.2s; }
+    .tab.active { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px; }
+    .form-input, .form-select {
+      width: 100%; padding: 12px 14px; font-size: 0.92rem; font-family: inherit;
+      border: 2px solid var(--border); background: #fff; color: var(--ink);
+      border-radius: 30px 12px 30px 12px / 12px 30px 12px 30px;
+    }
+    .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .form-row { display: flex; gap: 10px; }
+    .form-row .form-group { flex: 1; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 24px; font-size: 0.95rem; font-family: inherit; font-weight: 600; border: 2px solid var(--ink); border-radius: 30px 12px 30px 12px / 12px 30px 12px 30px; cursor: pointer; transition: all 0.15s; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); width: 100%; }
+    .btn-primary:hover:not(:disabled) { background: #d56f50; transform: translateY(-1px); }
+    .btn-secondary { background: #fff; color: var(--ink); border-color: var(--border); }
+    .tag { display: inline-block; padding: 4px 12px; font-size: 0.75rem; font-weight: 600; border-radius: 20px; background: var(--tag-bg); color: var(--ink-light); border: 1.5px solid var(--border); }
+    .tag.active-tag { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+    .result-area { display: none; }
+    .result-area.show { display: block; }
+    .view-image { width: 100%; height: 220px; background: #f5f0e8; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 14px; border: 2px solid var(--border); position: relative; }
+    .view-image img { width: 100%; height: 100%; object-fit: cover; }
+    .placeholder-icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .view-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .view-info { font-size: 0.85rem; color: var(--ink-light); line-height: 1.7; background: var(--paper); padding: 14px; border-radius: 12px; border: 1.5px solid var(--border); }
+    .zone-chip { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 6px; border: 2px solid var(--border); border-radius: 14px 6px 14px 6px / 6px 14px 6px 14px; background: #fff; cursor: pointer; transition: all 0.2s; aspect-ratio: 1; }
+    .zone-chip:hover, .zone-chip.active { border-color: var(--accent); background: #fefaf7; }
+    .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: #fff; border-top: 2px solid var(--border); display: flex; z-index: 100; padding: 6px 0 env(safe-area-inset-bottom, 8px); }
+    .nav-item { flex: 1; text-align: center; padding: 8px 4px; cursor: pointer; font-size: 0.72rem; color: var(--muted); transition: color 0.2s; }
+    .nav-item.active { color: var(--accent); font-weight: 700; }
+    .nav-icon { font-size: 1.3rem; display: block; margin-bottom: 2px; }
+    .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); background: rgba(44,44,44,0.85); color: #fff; padding: 14px 28px; border-radius: 14px; font-size: 0.9rem; z-index: 9999; opacity: 0; transition: all 0.25s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .loading { text-align: center; padding: 30px; color: var(--muted); font-size: 0.9rem; }
+    .loading .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .searchable-wrap { position: relative; }
+    .searchable-dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 2px solid var(--border); border-radius: 12px; margin-top: 4px; max-height: 300px; overflow-y: auto; z-index: 10; box-shadow: var(--shadow); }
+    .searchable-dropdown.show { display: block; }
+    .dropdown-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f0ece4; }
+    .dropdown-item:hover { background: var(--paper); }
+    .dropdown-item:last-child { border-bottom: none; }
+    .star { color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="app-container">
+  <div class="header">
+    <div class="logo-row">
+      <svg class="logo-icon" viewBox="0 0 44 44" fill="none"><circle cx="22" cy="22" r="20" fill="#fce4db" stroke="#e87d5e" stroke-width="2"/><path d="M14 28 L22 14 L30 28" stroke="#e87d5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="22" cy="32" r="2" fill="#e87d5e"/></svg>
+      <div class="logo-text"><span>SeatLight</span></div>
+    </div>
+    <div class="header-subtitle">首尔演唱会座位视角查询</div>
+    <div class="badge-seoul">SEOUL CONCERT</div>
+  </div>
+  <div class="tabs" id="mainTabs">
+    <button class="tab active" data-tab="search">查视角</button>
+    <button class="tab" data-tab="upload">传视角</button>
+  </div>
+  <div class="tab-content" id="tab-search">
+    <div class="card">
+      <div class="card-title"><span class="icon">🏟️</span> 选择场馆</div>
+      <div class="searchable-wrap">
+        <input class="form-input" id="venueInput" placeholder="搜索场馆名称..." oninput="handleVenueSearch()" autocomplete="off">
+        <input type="hidden" id="venue">
+        <div class="searchable-dropdown" id="venueDropdown"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">🔍</span> 查找座位视角</div>
+      <div class="form-group">
+        <label class="form-label">区域 <span class="star">*</span></label>
+        <input class="form-input" id="section" placeholder="如：7区、32区">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">排</label>
+          <input class="form-input" id="row" placeholder="如：10">
+        </div>
+        <div class="form-group">
+          <label class="form-label">座位号</label>
+          <input class="form-input" id="seat" placeholder="如：4">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="searchView()" style="flex:1">🔍 查找视角</button>
+        <button class="btn btn-secondary" onclick="resetSearch()" style="width:auto">重置</button>
+      </div>
+    </div>
+    <div class="result-area" id="resultArea">
+      <div class="card">
+        <div class="card-title"><span class="icon">👁️</span> 座位视角</div>
+        <div class="view-image" id="viewImage">
+          <span class="placeholder-icon">🎪</span>
+          <span>请输入区域号查找视角</span>
+        </div>
+        <div class="view-meta" id="viewMeta"></div>
+        <div class="view-info" id="viewInfo" style="display:none"></div>
+      </div>
+    </div>
+    <div id="venueViewsList" style="display:none">
+      <div class="card">
+        <div class="card-title"><span class="icon">📋</span> <span id="venueViewsListTitle"></span></div>
+        <div id="venueViewsListContent"></div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-content" id="tab-upload" style="display:none">
+    <div class="card">
+      <div class="card-title"><span class="icon">📸</span> 上传视角图</div>
+      <p style="color:var(--ink-light);font-size:0.9rem;line-height:1.6">
+        上传功能需要后端服务支持。当前为静态展示版本，如需上传视角图，请联系管理员。
+      </p>
+      <div style="margin-top:20px;padding:16px;background:var(--accent-soft);border-radius:12px;font-size:0.85rem;color:var(--accent)">
+        💡 你可以查看已有的视角图，或联系管理员添加新的视角数据。
+      </div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item active" data-nav="search" onclick="switchTab('search')">
+      <span class="nav-icon">🔍</span>查视角
+    </div>
+    <div class="nav-item" data-nav="upload" onclick="switchTab('upload')">
+      <span class="nav-icon">📸</span>传视角
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 飞书数据（已嵌入，图片指向本地） =====
+const FEISHU_DATA = [
+  {"section":"1区(24区)","row":"","desc":"视野视线受阻区","artist":"","uploadTime":"2026-06-30","imgUrl":"images/1.jpg"},
+  {"section":"2区(25区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/2.jpg"},
+  {"section":"3区(26/27区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/3.jpg"},
+  {"section":"4区(28区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/4.jpg"},
+  {"section":"5区(29/30区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/5.jpg"},
+  {"section":"6区(31区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/6.jpg"},
+  {"section":"7区(32区)","row":"10排4号","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/7.jpg"},
+  {"section":"8区(33/34区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/8.jpg"},
+  {"section":"9区(35区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/9.jpg"},
+  {"section":"10区(36区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/10.jpg"},
+  {"section":"11区(37区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/11.jpg"},
+  {"section":"12区(38/39区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/12.jpg"},
+  {"section":"13区(40区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/13.jpg"},
+  {"section":"14区(41/42区)","row":"","desc":"视野","artist":"","uploadTime":"2026-06-30","imgUrl":"images/14.jpg"},
+  {"section":"15区(43区)","row":"","desc":"视野视线受阻区","artist":"","uploadTime":"2026-06-30","imgUrl":"images/15.jpg"}
+];
+
+// ===== 场馆 =====
+const allVenues = [
+  { id: 'kspo-dome', name: 'KSPO DOME 奥林匹克体操竞技场', short: 'KSPO DOME', city: '首尔', views: FEISHU_DATA.length, icon: '🏟️', color: '#e87d5e', capacity: '~15,000' },
+];
+
+let dataLoaded = true;
+
+// ===== 辅助函数 =====
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('#mainTabs .tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#mainTabs .tab[data-tab="' + tab + '"]').forEach(t => t.classList.add('active'));
+  document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav .nav-item[data-nav="' + tab + '"]').forEach(n => n.classList.add('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+  document.getElementById('tab-' + tab).style.display = 'block';
+}
+
+document.getElementById('mainTabs').addEventListener('click', function(e) {
+  if (e.target.classList.contains('tab')) switchTab(e.target.dataset.tab);
+});
+
+// ===== 场馆搜索 =====
+function handleVenueSearch() {
+  const input = document.getElementById('venueInput');
+  const dropdown = document.getElementById('venueDropdown');
+  const query = input.value.toLowerCase().trim();
+  const filtered = query ? allVenues.filter(v => v.name.toLowerCase().includes(query) || v.short.toLowerCase().includes(query)) : allVenues;
+  dropdown.innerHTML = filtered.map(v => `<div class="dropdown-item" onclick="selectVenue('${v.id}','${v.name.replace(/'/g, "\\'")}')"><strong>${v.icon} ${v.name}</strong><div style="font-size:0.72rem;color:var(--muted)">${v.city} · ${v.capacity}人 · ${v.views}张视角</div></div>`).join('');
+  dropdown.classList.toggle('show', filtered.length > 0);
+}
+
+function selectVenue(id, name) {
+  document.getElementById('venue').value = id;
+  document.getElementById('venueInput').value = name;
+  document.getElementById('venueDropdown').classList.remove('show');
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.searchable-wrap')) {
+    document.querySelectorAll('.searchable-dropdown').forEach(d => d.classList.remove('show'));
+  }
+});
+
+// ===== 搜索视角 =====
+let carouselMatches = [];
+let carouselIndex = 0;
+
+function resetSearch() {
+  document.getElementById('venue').value = '';
+  document.getElementById('venueInput').value = '';
+  document.getElementById('section').value = '';
+  document.getElementById('row').value = '';
+  document.getElementById('seat').value = '';
+  document.getElementById('resultArea').classList.remove('show');
+  document.getElementById('venueViewsList').style.display = 'none';
+  showToast('已重置');
+}
+
+function searchView() {
+  const venue = document.getElementById('venue').value;
+  const section = document.getElementById('section').value.trim();
+  const row = document.getElementById('row').value.trim();
+  const seat = document.getElementById('seat').value.trim();
+
+  if (!venue) { showToast('请先选择场馆'); return; }
+
+  if (!section && !row && !seat) {
+    const venueName = allVenues.find(v => v.id === venue)?.name || venue;
+    showVenueViewsList(FEISHU_DATA, venueName, venue);
+    return;
+  }
+
+  const resultArea = document.getElementById('resultArea');
+  const viewImage = document.getElementById('viewImage');
+  const viewMeta = document.getElementById('viewMeta');
+  const viewInfo = document.getElementById('viewInfo');
+
+  resultArea.classList.add('show');
+  document.getElementById('venueViewsList').style.display = 'none';
+  viewImage.innerHTML = '<div class="loading"><div class="spinner"></div><div>加载中...</div></div>';
+  viewMeta.innerHTML = '';
+  viewInfo.style.display = 'none';
+
+  setTimeout(() => {
+    const venueName = allVenues.find(v => v.id === venue)?.name || venue;
+
+    let matches = FEISHU_DATA.filter(v => {
+      if (section) {
+        const sDigits = section.match(/(\d+)/);
+        const vDigits = v.section.match(/(\d+)/);
+        if (sDigits && vDigits) return sDigits[1] === vDigits[1];
+        return v.section.includes(section);
+      }
+      return true;
+    });
+
+    if ((row || seat) && matches.length > 0) {
+      const seatQuery = (row + ' ' + seat).toLowerCase().trim();
+      const filtered = matches.filter(v => (v.row || '').toLowerCase().includes(seatQuery));
+      if (filtered.length > 0) matches = filtered;
+    }
+
+    if (matches.length > 0) {
+      carouselMatches = matches;
+      carouselIndex = 0;
+      renderCarousel();
+    } else {
+      viewImage.innerHTML = '<span class="placeholder-icon">🎪</span><span>暂无该位置视角图</span>';
+      viewMeta.innerHTML = `<span class="tag">${venueName}</span><span class="tag">待补充</span>`;
+      viewInfo.style.display = 'block';
+      viewInfo.textContent = '该位置暂无视角图';
+    }
+  }, 400);
+}
+
+function renderCarousel() {
+  const viewImage = document.getElementById('viewImage');
+  const viewMeta = document.getElementById('viewMeta');
+  const viewInfo = document.getElementById('viewInfo');
+  const venue = document.getElementById('venue').value;
+  const venueName = allVenues.find(v => v.id === venue)?.name || venue;
+  const match = carouselMatches[carouselIndex];
+
+  if (match.imgUrl) {
+    viewImage.innerHTML = `<img src="${match.imgUrl}" alt="${match.section}" onerror="this.parentElement.innerHTML='<span class=\\'placeholder-icon\\'>🎪</span><span>图片加载失败</span>'">`;
+  } else {
+    viewImage.innerHTML = '<span class="placeholder-icon">🎪</span><span>暂无图片</span>';
+  }
+
+  viewMeta.innerHTML = `<span class="tag active-tag">${venueName}</span><span class="tag">${match.section}</span>${match.row ? '<span class="tag">' + match.row + '</span>' : ''}${carouselMatches.length > 1 ? '<span class="tag" style="color:var(--accent)">' + (carouselIndex + 1) + '/' + carouselMatches.length + '</span>' : ''}`;
+
+  viewInfo.style.display = 'block';
+  viewInfo.innerHTML = `<strong>${match.section}${match.row ? ' · ' + match.row : ''}</strong><br>${match.desc}<br><small style="color:var(--muted)">${match.uploadTime}</small>`;
+
+  if (carouselMatches.length > 1) {
+    const prevBtn = carouselIndex > 0 ? `<button onclick="navigateCarousel(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.9);border:1.5px solid var(--border);cursor:pointer;font-size:0.8rem">◀</button>` : '';
+    const nextBtn = carouselIndex < carouselMatches.length - 1 ? `<button onclick="navigateCarousel(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.9);border:1.5px solid var(--border);cursor:pointer;font-size:0.8rem">▶</button>` : '';
+    viewImage.style.position = 'relative';
+    viewImage.insertAdjacentHTML('beforeend', prevBtn + nextBtn);
+  }
+}
+
+function navigateCarousel(dir) {
+  carouselIndex = Math.max(0, Math.min(carouselMatches.length - 1, carouselIndex + dir));
+  renderCarousel();
+}
+
+// ===== 场馆视角列表 =====
+let currentVenueId = null;
+let currentVenueViews = [];
+
+function showVenueViewsList(views, venueName, venueId) {
+  const list = document.getElementById('venueViewsList');
+  const title = document.getElementById('venueViewsListTitle');
+  const content = document.getElementById('venueViewsListContent');
+
+  currentVenueId = venueId;
+  currentVenueViews = views;
+  title.textContent = venueName + ' · 区域视角';
+  list.style.display = 'block';
+
+  const zoneMap = {};
+  views.forEach(v => {
+    const zoneMatch = v.section.match(/(\d+)/);
+    const zoneKey = zoneMatch ? zoneMatch[1] : v.section;
+    if (!zoneMap[zoneKey]) zoneMap[zoneKey] = [];
+    zoneMap[zoneKey].push(v);
+  });
+
+  const sortedZones = Object.keys(zoneMap).sort((a, b) => parseInt(a) - parseInt(b));
+
+  content.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px">
+      ${sortedZones.map(zone => {
+        const zv = zoneMap[zone];
+        const hasImg = zv.some(v => v.imgUrl);
+        return `<div class="zone-chip" onclick="selectZone('${zone}')" style="${hasImg ? 'border-color:var(--accent)' : ''}">
+          <div style="font-size:0.9rem;font-weight:700">${zone}区</div>
+          <div style="font-size:0.55rem;color:var(--accent);font-weight:600">${zv.length}条${hasImg ? ' 📷' : ''}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div id="zoneDetailPanel" style="display:none"><div id="zoneDetailContent"></div></div>
+  `;
+
+  list.scrollIntoView({ behavior: 'smooth' });
+}
+
+function selectZone(zone) {
+  document.querySelectorAll('.zone-chip').forEach(c => { c.classList.remove('active'); c.style.borderColor = 'var(--border)'; });
+  const chip = event.target.closest('.zone-chip');
+  if (chip) { chip.classList.add('active'); chip.style.borderColor = 'var(--accent)'; }
+
+  const matches = currentVenueViews.filter(v => { const m = v.section.match(/(\d+)/); return m && m[1] === zone; });
+  const panel = document.getElementById('zoneDetailPanel');
+  const detail = document.getElementById('zoneDetailContent');
+  panel.style.display = 'block';
+
+  detail.innerHTML = matches.map(v => {
+    return `<div style="background:#fff;border:1.5px solid var(--accent);border-radius:16px 6px 16px 6px;padding:14px;margin-bottom:10px">
+      ${v.imgUrl ? `<img src="${v.imgUrl}" style="width:100%;max-height:200px;border-radius:12px;object-fit:cover;margin-bottom:10px" onerror="this.style.display='none'" loading="lazy">` : ''}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><strong>${v.section}</strong><span style="font-size:0.75rem;color:var(--accent)">⭐⭐⭐⭐</span></div>
+      ${v.row ? `<div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px">${v.row}</div>` : ''}
+      <div style="font-size:0.8rem;color:var(--ink-light);line-height:1.6">${v.desc}</div>
+      <div style="font-size:0.65rem;color:var(--muted);margin-top:6px">${v.uploadTime}</div>
+    </div>`;
+  }).join('');
+
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+</script>
+</body>
+</html>
