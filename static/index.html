@@ -458,11 +458,14 @@ function selectZone(zone) {
   var input = document.getElementById('inviteCode');
   var error = document.getElementById('inviteError');
 
-  // 如果已经验证过，直接隐藏
-  if (localStorage.getItem('inviteVerified') === '1') {
+  // 如果已经验证过且保存了邀请码，直接隐藏
+  if (localStorage.getItem('inviteVerified') === '1' && localStorage.getItem('inviteCode')) {
     overlay.classList.add('hidden');
     return;
   }
+
+  // 否则显示弹窗让用户输入
+  overlay.classList.remove('hidden');
 
   // 回车提交
   input.addEventListener('keydown', function(e) {
