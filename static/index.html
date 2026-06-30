@@ -579,8 +579,8 @@ async function doUpload() {
       headers: apiHeaders,
       body: JSON.stringify(recordData)
     });
-    const recordData = await recordRes.json();
-    if (recordData.error) throw new Error(recordData.error);
+    const recordResult = await recordRes.json();
+    if (recordResult.error) throw new Error(recordResult.error);
 
     // 3. 显示成功
     status.textContent = '✅ 上传成功！感谢你的分享';
