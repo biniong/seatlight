@@ -190,9 +190,11 @@ async function getAllRecords() {
 }
 
 async function createRecord(fields) {
+  console.log('[CreateRecord] fields:', JSON.stringify(fields));
   const data = await feishuRequest('POST',
     `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.tableId}/records`,
     { fields });
+  console.log('[CreateRecord] response:', JSON.stringify(data));
   return data.data?.record;
 }
 
@@ -420,8 +422,9 @@ const server = http.createServer(async (req, res) => {
       if (pathname === '/api/upload' && req.method === 'POST') {
         if (!json || !json.image) throw new Error('No image data');
         const result = await uploadImage(json.image, json.fileName);
+        console.log('[Upload] Response:', JSON.stringify(result));
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ fileKey: result.file_key, url: result.url }));
+        res.end(JSON.stringify({ fileKey: result.file_key, fileToken: result.file_token, url: result.url, raw: result }));
         return;
       }
 

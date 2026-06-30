@@ -544,8 +544,6 @@ async function doUpload() {
   try {
     // 获取图片 base64
     const imgData = document.getElementById('up-img').src;
-    const base64 = imgData.split(',')[1];
-    const mimeType = imgData.match(/^data:(image\/\w+);base64/)[1];
     const fileName = selectedFile.name || 'upload.jpg';
 
     // 获取邀请码
@@ -555,14 +553,20 @@ async function doUpload() {
       'X-Invite-Code': inviteCode
     };
 
-    // 1. 上传图片到飞书云盘
+    // 1. 上传图片到飞书
     const uploadRes = await fetch('/api/upload', {
       method: 'POST',
       headers: apiHeaders,
       body: JSON.stringify({ image: imgData, fileName: fileName })
     });
     const uploadData = await uploadRes.json();
-    if (uploadData.error) throw new Error(uploadData.error);
+    console.log('[Upload] Response:', uploadData);
+    if (uploadData.error) throw new Error('上传失败: ' + uploadData.error);
+
+    // 调试：显示上传返回的数据
+    status.textContent = '图片已上传, fileKey: ' + (uploadData.fileKey || '无') + ', fileToken: ' + (uploadData.fileToken || '无');
+    status.style.display = 'block';
+    await new Promise(r => setTimeout(r, 2000));
 
     // 2. 创建记录到飞书多维表格
     const recordData = {
@@ -571,7 +575,7 @@ async function doUpload() {
         '排/座位号': row ? (row + '排' + (seat ? seat + '号' : '')) : (seat ? seat + '号' : ''),
         '视角描述': desc || '用户上传的演唱会现场视角',
         '艺人': '',
-        '图片': [{ token: uploadData.fileKey }],
+        '图片': [{ file_token: uploadData.fileKey }],
         '上传时间': new Date().toISOString().split('T')[0],
       }
     };
@@ -586,7 +590,6 @@ async function doUpload() {
 
     // 3. 显示成功
     status.textContent = '✅ 上传成功！感谢你的分享';
-    status.style.display = 'block';
     showToast('视角已提交');
 
     // 4. 重置表单
