@@ -571,6 +571,7 @@ async function doUpload() {
     // 2. 创建记录到飞书多维表格
     const recordData = {
       fields: {
+        '场馆': venue,
         '区域': section,
         '排/座位号': row ? (row + '排' + (seat ? seat + '号' : '')) : (seat ? seat + '号' : ''),
         '视角描述': desc || '用户上传的演唱会现场视角',
