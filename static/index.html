@@ -326,33 +326,95 @@ function searchView() {
 
   setTimeout(() => {
     const venueName = allVenues.find(v => v.id === venue)?.name || venue;
+    const inviteCode = localStorage.getItem('inviteCode') || '';
 
-    let matches = FEISHU_DATA.filter(v => {
-      if (section) {
-        const sDigits = section.match(/(\d+)/);
-        const vDigits = v.section.match(/(\d+)/);
-        if (sDigits && vDigits) return sDigits[1] === vDigits[1];
-        return v.section.includes(section);
-      }
-      return true;
-    });
+    // 从后端 API 实时查询飞书数据
+    fetch('/api/records', { headers: { 'X-Invite-Code': inviteCode } })
+      .then(r => r.json())
+      .then(apiData => {
+        // 转换飞书记录格式为前端格式
+        let liveData = (apiData.records || []).map(rec => {
+          const f = rec.fields || {};
+          const imgs = f['图片'] || [];
+          const fileToken = imgs.length > 0 ? (imgs[0].file_token || '') : '';
+          return {
+            section: f['区域'] || '',
+            row: f['排/座位号'] || '',
+            desc: f['视角描述'] || '',
+            artist: f['艺人'] || '',
+            uploadTime: f['上传时间'] || '',
+            venue: f['场馆'] || '',
+            imgUrl: fileToken ? '/img/' + fileToken : ''
+          };
+        });
 
-    if ((row || seat) && matches.length > 0) {
-      const seatQuery = (row + ' ' + seat).toLowerCase().trim();
-      const filtered = matches.filter(v => (v.row || '').toLowerCase().includes(seatQuery));
-      if (filtered.length > 0) matches = filtered;
-    }
+        // 合并硬编码数据和实时数据（去重）
+        const hardcodedKeys = new Set(FEISHU_DATA.map(v => v.section + '|' + v.row));
+        liveData = liveData.filter(v => !hardcodedKeys.has(v.section + '|' + v.row));
+        const allData = [...FEISHU_DATA, ...liveData];
 
-    if (matches.length > 0) {
-      carouselMatches = matches;
-      carouselIndex = 0;
-      renderCarousel();
-    } else {
-      viewImage.innerHTML = '<span class="placeholder-icon">🎪</span><span>暂无该位置视角图</span>';
-      viewMeta.innerHTML = `<span class="tag">${venueName}</span><span class="tag">待补充</span>`;
-      viewInfo.style.display = 'block';
-      viewInfo.textContent = '该位置暂无视角图';
-    }
+        let matches = allData.filter(v => {
+          if (section) {
+            const sDigits = section.match(/(\d+)/);
+            const vDigits = v.section.match(/(\d+)/);
+            if (sDigits && vDigits) return sDigits[1] === vDigits[1];
+            return v.section.includes(section);
+          }
+          return true;
+        });
+
+        if ((row || seat) && matches.length > 0) {
+          const rowQuery = row ? row + '排' : '';
+          const seatQueryFull = seat ? seat + '号' : '';
+          const filtered = matches.filter(v => {
+            const r = (v.row || '').toLowerCase();
+            let match = true;
+            if (row) match = match && r.includes(rowQuery.toLowerCase());
+            if (seat) match = match && r.includes(seatQueryFull.toLowerCase());
+            return match;
+          });
+          if (filtered.length > 0) matches = filtered;
+        }
+
+        if (matches.length > 0) {
+          carouselMatches = matches;
+          carouselIndex = 0;
+          renderCarousel();
+        } else {
+          viewImage.innerHTML = '<span class="placeholder-icon">🎪</span><span>暂无该位置视角图</span>';
+          viewMeta.innerHTML = '<span class="tag">' + venueName + '</span><span class="tag">待补充</span>';
+          viewInfo.style.display = 'block';
+          viewInfo.textContent = '该位置暂无视角图';
+        }
+      })
+      .catch(err => {
+        console.error('[Search] API error:', err);
+        // 降级使用硬编码数据
+        let matches = FEISHU_DATA.filter(v => {
+          if (section) {
+            const sDigits = section.match(/(\d+)/);
+            const vDigits = v.section.match(/(\d+)/);
+            if (sDigits && vDigits) return sDigits[1] === vDigits[1];
+            return v.section.includes(section);
+          }
+          return true;
+        });
+        if ((row || seat) && matches.length > 0) {
+          const seatQuery = (row + ' ' + seat).toLowerCase().trim();
+          const filtered = matches.filter(v => (v.row || '').toLowerCase().includes(seatQuery));
+          if (filtered.length > 0) matches = filtered;
+        }
+        if (matches.length > 0) {
+          carouselMatches = matches;
+          carouselIndex = 0;
+          renderCarousel();
+        } else {
+          viewImage.innerHTML = '<span class="placeholder-icon">🎪</span><span>暂无该位置视角图</span>';
+          viewMeta.innerHTML = '<span class="tag">' + venueName + '</span><span class="tag">待补充</span>';
+          viewInfo.style.display = 'block';
+          viewInfo.textContent = '该位置暂无视角图';
+        }
+      });
   }, 400);
 }
 
