@@ -192,7 +192,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">选择图片 *</label>
-        <input type="file" class="form-input" id="up-file" accept="image/*" style="padding:10px">
+        <input type="file" class="form-input" id="up-file" accept="image/*" style="padding:10px" onchange="handleFileSelect(event)">
         <div id="up-preview" style="margin-top:10px;display:none">
           <img id="up-img" style="max-width:100%;border-radius:12px;border:2px solid var(--border)">
         </div>
@@ -489,6 +489,7 @@ function checkInviteCode() {
     .then(function(data) {
       if (data.ok) {
         localStorage.setItem('inviteVerified', '1');
+        localStorage.setItem('inviteCode', code);
         document.getElementById('inviteOverlay').classList.add('hidden');
       } else {
         errorEl.textContent = '邀请码错误，请重试';
@@ -503,6 +504,105 @@ function checkInviteCode() {
       btn.disabled = false;
       btn.textContent = '✅ 验证';
     });
+}
+
+// ===== 传视角功能 =====
+let selectedFile = null;
+
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('up-img').src = e.target.result;
+    document.getElementById('up-preview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function doUpload() {
+  const venue = document.getElementById('up-venue').value;
+  const section = document.getElementById('up-area').value.trim();
+  const row = document.getElementById('up-row').value.trim();
+  const seat = document.getElementById('up-seat').value.trim();
+  const desc = document.getElementById('up-desc').value.trim();
+
+  if (!venue) { showToast('请选择场馆'); return; }
+  if (!selectedFile) { showToast('请选择图片'); return; }
+  if (!section) { showToast('请填写区域'); return; }
+
+  const btn = document.getElementById('up-btn');
+  const status = document.getElementById('up-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ 上传中...';
+  status.style.display = 'none';
+
+  try {
+    // 获取图片 base64
+    const imgData = document.getElementById('up-img').src;
+    const base64 = imgData.split(',')[1];
+    const mimeType = imgData.match(/^data:(image\/\w+);base64/)[1];
+    const fileName = selectedFile.name || 'upload.jpg';
+
+    // 获取邀请码
+    const inviteCode = localStorage.getItem('inviteCode') || '';
+    const apiHeaders = {
+      'Content-Type': 'application/json',
+      'X-Invite-Code': inviteCode
+    };
+
+    // 1. 上传图片到飞书云盘
+    const uploadRes = await fetch('/api/upload', {
+      method: 'POST',
+      headers: apiHeaders,
+      body: JSON.stringify({ image: imgData, fileName: fileName })
+    });
+    const uploadData = await uploadRes.json();
+    if (uploadData.error) throw new Error(uploadData.error);
+
+    // 2. 创建记录到飞书多维表格
+    const recordData = {
+      fields: {
+        '场馆': venue,
+        '区域': section,
+        '排/座位号': row ? (row + '排' + (seat ? seat + '号' : '')) : (seat ? seat + '号' : ''),
+        '视角描述': desc || '用户上传的演唱会现场视角',
+        '艺人': '',
+        '图片': [{ type: 'image', file_key: uploadData.fileKey }],
+        '上传时间': new Date().toISOString().split('T')[0],
+      }
+    };
+
+    const recordRes = await fetch('/api/records', {
+      method: 'POST',
+      headers: apiHeaders,
+      body: JSON.stringify(recordData)
+    });
+    const recordData = await recordRes.json();
+    if (recordData.error) throw new Error(recordData.error);
+
+    // 3. 显示成功
+    status.textContent = '✅ 上传成功！感谢你的分享';
+    status.style.display = 'block';
+    showToast('视角已提交');
+
+    // 4. 重置表单
+    document.getElementById('up-area').value = '';
+    document.getElementById('up-row').value = '';
+    document.getElementById('up-seat').value = '';
+    document.getElementById('up-desc').value = '';
+    document.getElementById('up-file').value = '';
+    document.getElementById('up-preview').style.display = 'none';
+    selectedFile = null;
+  } catch (err) {
+    status.textContent = '❌ 上传失败：' + err.message;
+    status.style.display = 'block';
+    showToast('上传失败');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📤 上传视角';
+  }
 }
 </script>
 </body>
