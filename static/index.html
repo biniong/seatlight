@@ -571,7 +571,7 @@ async function doUpload() {
         '排/座位号': row ? (row + '排' + (seat ? seat + '号' : '')) : (seat ? seat + '号' : ''),
         '视角描述': desc || '用户上传的演唱会现场视角',
         '艺人': '',
-        '图片': [uploadData.fileToken],
+        '图片': [{ token: uploadData.fileKey }],
         '上传时间': new Date().toISOString().split('T')[0],
       }
     };
