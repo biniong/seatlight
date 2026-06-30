@@ -575,10 +575,11 @@ async function doUpload() {
         '排/座位号': row ? (row + '排' + (seat ? seat + '号' : '')) : (seat ? seat + '号' : ''),
         '视角描述': desc || '用户上传的演唱会现场视角',
         '艺人': '',
-        '图片': [{ file_token: uploadData.fileKey }],
+        '图片': uploadData.fileToken ? [{ file_token: uploadData.fileToken }] : [],
         '上传时间': new Date().toISOString().split('T')[0],
       }
     };
+    console.log('[Record] Sending:', JSON.stringify(recordData));
 
     const recordRes = await fetch('/api/records', {
       method: 'POST',
@@ -586,6 +587,7 @@ async function doUpload() {
       body: JSON.stringify(recordData)
     });
     const recordResult = await recordRes.json();
+    console.log('[Record] Result:', JSON.stringify(recordResult));
     if (recordResult.error) throw new Error(recordResult.error);
 
     // 3. 显示成功

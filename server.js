@@ -227,7 +227,7 @@ async function uploadImage(base64Data, fileName) {
     body: fullBody,
   });
   const data = await res.json();
-  if (data.code !== 0) throw new Error('上传失败: ' + data.msg);
+  if (data.code !== 0) throw new Error('上传失败: ' + data.msg + ' (raw: ' + JSON.stringify(data) + ')');
   return data.data;
 }
 
