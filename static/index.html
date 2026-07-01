@@ -448,7 +448,10 @@ function loadInitialData() {
 
 // ===== Banner 从飞书表格加载（失败则保留本地 fallback） =====
 function loadBannerFromApi() {
-  fetch('/api/banner/list', { headers: getHeaders() })
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+
+  fetch('/api/banner/list', { signal: controller.signal })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.records && data.records.length > 0) {
@@ -465,7 +468,8 @@ function loadBannerFromApi() {
         if (bannerSlides.length > 0) renderBanner();
       }
     })
-    .catch(function() { /* 网络失败，保留本地 fallback */ });
+    .catch(function() { /* 超时或网络失败，保留本地 fallback */ })
+    .finally(function() { clearTimeout(timeout); });
 }
 
 // ===== Banner 轮播（内嵌图片） =====

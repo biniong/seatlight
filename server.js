@@ -383,8 +383,9 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // ===== API（需要邀请码） =====
-  if (pathname.startsWith('/api/')) {
+  // ===== 公开 GET API（无需邀请码） =====
+  const publicGetApis = ['/api/records', '/api/banner/list', '/api/venues/list'];
+  if (pathname.startsWith('/api/') && !publicGetApis.includes(pathname)) {
     const code = req.headers['x-invite-code'] || '';
     if (code !== CONFIG.inviteCode) {
       res.writeHead(403, { 'Content-Type': 'application/json' });
