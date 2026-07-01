@@ -407,6 +407,70 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ===== 临时 API：诊断同步问题 =====
+  if (pathname === '/api/debug/sync-test' && req.method === 'GET') {
+    const inviteCode = req.headers['x-invite-code'];
+    if (inviteCode !== CONFIG.inviteCode) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '无效的邀请码' }));
+      return;
+    }
+    try {
+      const result = { tokenOk: false, pendingCount: 0, approvedCount: 0, errors: [], testCreate: null };
+      
+      // 1. 检查 token
+      if (tokenState.userToken && Date.now() < tokenState.expiresAt - 60000) {
+        result.tokenOk = true;
+      } else {
+        result.errors.push('Token expired or missing');
+      }
+      
+      // 2. 查询待审核表
+      if (result.tokenOk) {
+        const data = await feishuRequest('GET',
+          `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records?page_size=100`,
+          null, false);
+        result.pendingCount = data.data?.items?.length || 0;
+        
+        const approved = (data.data?.items || []).filter(r => r.fields['审核状态'] === '已通过');
+        result.approvedCount = approved.length;
+        
+        // 3. 尝试创建一条测试记录
+        if (approved.length > 0) {
+          const testFields = { ...approved[0].fields };
+          delete testFields['审核状态'];
+          delete testFields['审核时间'];
+          delete testFields['审核备注'];
+          result.testFields = testFields;
+          
+          try {
+            const createData = await feishuRequest('POST',
+              `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.tableId}/records`,
+              { fields: testFields });
+            result.testCreate = { ok: true, record_id: createData.data?.record?.record_id };
+            
+            // 删除测试记录
+            if (createData.data?.record?.record_id) {
+              await feishuRequest('DELETE',
+                `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.tableId}/records/${createData.data.record.record_id}`,
+                null, false);
+              result.testCreate.deleted = true;
+            }
+          } catch (e) {
+            result.testCreate = { ok: false, error: e.message };
+          }
+        }
+      }
+      
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // ===== 邀请码验证 =====
   if (pathname === '/api/invite/check' && req.method === 'POST') {
     let body = '';
