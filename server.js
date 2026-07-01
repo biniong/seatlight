@@ -428,6 +428,89 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      // ===== v1.1 初始化：创建 Banner 表 + 场馆表 =====
+      if (pathname === '/api/setup/v1.1' && req.method === 'POST') {
+        const results = {};
+
+        // 1. 创建 Banner 表
+        const bannerCreate = await feishuRequest('POST', `/bitable/v1/apps/${CONFIG.baseId}/tables`, {
+          table: {
+            name: 'Banner',
+            fields: [
+              { field_name: '演出名称', type: 1 },
+              { field_name: '演出时间', type: 1 },
+              { field_name: '演出地点', type: 1 },
+              { field_name: '图片', type: 17 },
+            ]
+          }
+        });
+        results.bannerTableId = bannerCreate.data.table_id;
+        console.log('[Setup] Banner 表创建成功:', results.bannerTableId);
+
+        // 2. 创建 Venues 表
+        const venuesCreate = await feishuRequest('POST', `/bitable/v1/apps/${CONFIG.baseId}/tables`, {
+          table: {
+            name: 'Venues',
+            fields: [
+              { field_name: '场馆', type: 1 },
+              { field_name: '所在城市', type: 1 },
+              { field_name: '容量', type: 1 },
+              { field_name: '类型', type: 1 },
+              { field_name: '座位图', type: 17 },
+              { field_name: '到达方式', type: 1 },
+            ]
+          }
+        });
+        results.venuesTableId = venuesCreate.data.table_id;
+        console.log('[Setup] Venues 表创建成功:', results.venuesTableId);
+
+        // 3. 上传 Banner 图片并创建记录
+        const bannerItems = json.bannerItems || [];
+        const bannerResults = [];
+        for (const item of bannerItems) {
+          try {
+            const uploadRes = await uploadImage(item.image, item.fileName || 'banner.png');
+            await feishuRequest('POST',
+              `/bitable/v1/apps/${CONFIG.baseId}/tables/${results.bannerTableId}/records`,
+              { fields: {
+                '演出名称': item.name,
+                '演出时间': item.time,
+                '演出地点': item.location,
+                '图片': [{ file_token: uploadRes.file_token }]
+              }});
+            bannerResults.push({ name: item.name, ok: true });
+          } catch (e) {
+            bannerResults.push({ name: item.name, ok: false, error: e.message });
+          }
+        }
+        results.bannerItems = bannerResults;
+
+        // 4. 插入场馆数据
+        const venueItems = json.venueItems || [];
+        const venueResults = [];
+        for (const item of venueItems) {
+          try {
+            await feishuRequest('POST',
+              `/bitable/v1/apps/${CONFIG.baseId}/tables/${results.venuesTableId}/records`,
+              { fields: {
+                '场馆': item.name,
+                '所在城市': item.city,
+                '容量': item.capacity,
+                '类型': item.type,
+                '到达方式': item.arrival,
+              }});
+            venueResults.push({ name: item.name, ok: true });
+          } catch (e) {
+            venueResults.push({ name: item.name, ok: false, error: e.message });
+          }
+        }
+        results.venueItems = venueResults;
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, ...results }));
+        return;
+      }
+
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Not found' }));
 
