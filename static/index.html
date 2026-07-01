@@ -211,9 +211,7 @@
 
       <div class="form-group">
         <label class="form-label">区域</label>
-        <select class="form-input" id="filterZone">
-          <option value="">全部区域</option>
-        </select>
+        <input class="form-input" id="filterZone" placeholder="如：1区" autocomplete="off">
       </div>
 
       <div class="form-row">
@@ -503,60 +501,72 @@ function loadVenueData() {
         };
       });
       console.log('[Venue] 加载场馆:', venues.length, '个');
-      setupVenueDropdown('venueInput', 'venueDropdown', 'venue', null);
-      setupVenueDropdown('upVenueInput', 'upVenueDropdown', 'upVenue', null);
+      setupVenueDropdown('venueInput', 'venueDropdown', 'venue');
+      setupVenueDropdown('upVenueInput', 'upVenueDropdown', 'upVenue');
+      renderVenueDropdown('venueDropdown', venues);
+      renderVenueDropdown('upVenueDropdown', venues);
     })
     .catch(function() { console.warn('[Venue] 加载失败'); });
 }
 
-// ===== 场馆下拉 =====
-var venueDropdownInitialized = false;
-
+// ===== 场馆下拉（简洁版，不依赖 cloneNode）=====
 function setupVenueDropdown(inputId, dropdownId, hiddenId, onSelect) {
   var input = document.getElementById(inputId);
   var dropdown = document.getElementById(dropdownId);
 
-  if (!venueDropdownInitialized) {
-    venueDropdownInitialized = true;
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('.searchable-wrap')) {
-        document.querySelectorAll('.searchable-dropdown').forEach(function(d) {
-          d.classList.remove('show');
-        });
-      }
-    });
-  }
-
-  // 移除旧的事件监听器（避免重复绑定）
-  var newInput = input.cloneNode(true);
-  input.parentNode.replaceChild(newInput, input);
-  input = newInput;
+  if (!input || !dropdown) return;
 
   input.addEventListener('click', function(e) {
     e.stopPropagation();
-    renderVenueDropdown(dropdown, hiddenId, onSelect);
+    // 关闭其他下拉框
+    document.querySelectorAll('.searchable-dropdown').forEach(function(d) {
+      if (d !== dropdown) d.classList.remove('show');
+    });
     dropdown.classList.toggle('show');
+  });
+
+  input.addEventListener('focus', function(e) {
+    e.stopPropagation();
   });
 }
 
-function renderVenueDropdown(dropdown, hiddenId, onSelect) {
-  dropdown.innerHTML = venues.map(function(v) {
-    return '<div class="dropdown-item" onclick="selectVenue(\'' + v.id + '\',\'' + dropdown.id + '\',\'' + hiddenId + '\')"><div class="dropdown-item-title">' + escapeHtml(v.name) + '</div><div class="dropdown-item-meta">' + escapeHtml(v.city) + ' · ' + escapeHtml(v.capacity) + '</div></div>';
-  }).join('');
-}
+// 全局点击关闭下拉框
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.searchable-wrap')) {
+    document.querySelectorAll('.searchable-dropdown').forEach(function(d) {
+      d.classList.remove('show');
+    });
+  }
+});
 
-function selectVenue(venueId, dropdownId, hiddenId) {
-  var venue = venues.find(function(v) { return v.id === venueId; });
-  if (!venue) return;
+function renderVenueDropdown(dropdownId, venues) {
   var dropdown = document.getElementById(dropdownId);
-  var hidden = document.getElementById(hiddenId);
-  var wrap = dropdown.closest('.searchable-wrap');
-  var input = wrap.querySelector('.form-input');
-  input.value = venue.name;
-  hidden.value = venue.id;
-  dropdown.classList.remove('show');
-  currentVenue = venue;
-  if (dropdownId === 'venueDropdown') showVenueInfo(venue);
+  if (!dropdown) return;
+  dropdown.innerHTML = venues.map(function(v) {
+    return '<div class="dropdown-item" data-vid="' + v.id + '"><div class="dropdown-item-title">' + escapeHtml(v.name) + '</div><div class="dropdown-item-meta">' + escapeHtml(v.city) + ' · ' + escapeHtml(v.capacity) + '</div></div>';
+  }).join('');
+
+  // 用事件委托绑定点击
+  dropdown.querySelectorAll('.dropdown-item').forEach(function(item) {
+    item.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var venueId = item.getAttribute('data-vid');
+      var venue = venues.find(function(v) { return v.id === venueId; });
+      if (!venue) return;
+
+      var wrap = dropdown.closest('.searchable-wrap');
+      var input = wrap.querySelector('.form-input');
+      var hidden = wrap.querySelector('input[type="hidden"]');
+      if (input) input.value = venue.name;
+      if (hidden) hidden.value = venue.id;
+      dropdown.classList.remove('show');
+
+      if (dropdownId === 'venueDropdown') {
+        currentVenue = venue;
+        showVenueInfo(venue);
+      }
+    });
+  });
 }
 
 // ===== 显示场馆信息 =====
@@ -580,31 +590,8 @@ function showVenueInfo(venue) {
     document.getElementById('seatmapContainer').innerHTML = '<div class="seatmap-placeholder">座位图暂缺</div>';
   }
 
-  // 填充区域筛选下拉框（从视角数据中统计区域）
-  fetch('/api/records', { headers: getHeaders() })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var records = data.records || [];
-      var zoneSet = {};
-      records.forEach(function(rec) {
-        var f = rec.fields || {};
-        var section = f['区域'] || '';
-        var m = section.match(/(\d+)/);
-        var zoneKey = m ? m[1] : section;
-        if (zoneKey) zoneSet[zoneKey] = true;
-      });
-      var sortedZones = Object.keys(zoneSet).sort(function(a, b) { return parseInt(a) - parseInt(b); });
-
-      var filterZone = document.getElementById('filterZone');
-      if (filterZone) {
-        filterZone.innerHTML = '<option value="">全部区域</option>' + sortedZones.map(function(z) {
-          return '<option value="' + z + '">' + z + '区</option>';
-        }).join('');
-      }
-
       document.getElementById('venueInfoSection').style.display = 'block';
       document.getElementById('viewResultSection').style.display = 'none';
-    });
 }
 
 function renderCarousel() {
@@ -789,8 +776,10 @@ function applyFilter() {
 
         if (zone) {
           var zoneField = f['区域'] || '';
+          // 支持输入 "1" 或 "1区"，都匹配
+          var zoneNum = zone.replace(/[区]/g, '');
           var zoneMatch = zoneField.match(/(\d+)/);
-          if (!zoneMatch || zoneMatch[1] !== zone) return false;
+          if (!zoneMatch || zoneMatch[1] !== zoneNum) return false;
         }
 
         if (row || seat) {
