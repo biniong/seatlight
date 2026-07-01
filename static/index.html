@@ -128,6 +128,14 @@
     .file-preview img { max-width: 100%; max-height: 200px; border-radius: 6px; }
     .file-preview-remove { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; background: rgba(0,0,0,0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
     .file-preview-remove svg { width: 16px; height: 16px; fill: white; }
+    .file-preview-grid { display: none; gap: 8px; flex-wrap: wrap; }
+    .file-selector.has-file .file-preview-grid { display: flex; }
+    .file-preview-grid .preview-item { position: relative; flex: 1; min-width: 0; }
+    .file-preview-grid .preview-item img { width: 100%; height: 100px; object-fit: cover; border-radius: 6px; }
+    .file-preview-grid .preview-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; background: rgba(0,0,0,0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .file-preview-grid .preview-remove svg { width: 14px; height: 14px; fill: white; }
+    .file-counter { font-size: 0.75rem; color: var(--primary); margin-top: 6px; display: none; }
+    .file-selector.has-file .file-counter { display: block; }
 
     /* ===== 底部导航 ===== */
     .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--white); border-top: 1px solid var(--border); display: flex; z-index: 100; padding: 8px 0 env(safe-area-inset-bottom, 8px); }
@@ -246,6 +254,7 @@
               <div class="venue-meta-item"><svg class="venue-meta-icon"><use href="#icon-location"></use></svg><span id="venueCity"></span></div>
               <div class="venue-meta-item"><svg class="venue-meta-icon"><use href="#icon-capacity"></use></svg><span id="venueCapacity"></span></div>
               <div class="venue-meta-item"><svg class="venue-meta-icon"><use href="#icon-type"></use></svg><span id="venueType"></span></div>
+              <div class="venue-meta-item" id="venueArrivalWrap" style="display:none"><svg class="venue-meta-icon"><use href="#icon-transport"></use></svg><span id="venueArrival"></span></div>
             </div>
           </div>
         </div>
@@ -302,14 +311,15 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">选择图片 *</label>
+        <label class="form-label">选择图片 *（最多 3 张）</label>
         <div class="file-selector" id="fileSelector" onclick="document.getElementById('upFile').click()">
           <svg class="file-selector-icon"><use href="#icon-image"></use></svg>
           <div class="file-selector-text">点击选择图片</div>
-          <div class="file-selector-hint">支持 JPG、PNG 格式</div>
-          <div class="file-preview" id="filePreview"><img id="upImg" alt=""><div class="file-preview-remove" onclick="removeFile(event)"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></div></div>
+          <div class="file-selector-hint">支持 JPG、PNG 格式，最多 3 张</div>
+          <div class="file-preview-grid" id="filePreviewGrid"></div>
+          <div class="file-counter" id="fileCounter"></div>
         </div>
-        <input type="file" id="upFile" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+        <input type="file" id="upFile" accept="image/*" multiple style="display:none" onchange="handleFileSelect(event)">
       </div>
 
       <button class="btn btn-primary" id="upBtn" onclick="doUpload()">
@@ -345,6 +355,7 @@
   <symbol id="icon-capacity" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></symbol>
   <symbol id="icon-type" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/></symbol>
   <symbol id="icon-seatmap" viewBox="0 0 24 24"><path d="M4 18h3v-2H4v-3H2v5h2zm0-8h3V8H4V5H2v5h2zm4 8h12v-2H8v2zm0-8h12V8H8v2zM2 5v2h18V5H2z"/></symbol>
+  <symbol id="icon-transport" viewBox="0 0 24 24"><path d="M12 2c-4 0-8 .5-8 4v9.5c0 .83.67 1.5 1.5 1.5L4 19v1h3v-1h10v1h3v-1l-1.5-1.5c.83 0 1.5-.67 1.5-1.5V6c0-3.5-4-4-8-4zM7.5 16c-.83 0-1.5-.67-1.5-1.5S6.67 13 7.5 13s1.5.67 1.5 1.5S8.33 16 7.5 16zm3.5-7H6V6h5v3zm5 7c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1-7h-5V6h5v3z"/></symbol>
   <symbol id="icon-zone" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></symbol>
   <symbol id="icon-view" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></symbol>
   <symbol id="icon-image" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></symbol>
@@ -361,10 +372,11 @@ var inviteCode = localStorage.getItem(INVITE_CODE_KEY) || '';
 var venues = [];
 var currentVenue = null;
 var currentZone = null;
-var selectedFile = null;
+var selectedFiles = [];
 var carouselMatches = [];
 var carouselIndex = 0;
 var currentSlideIndex = 0;
+var carouselImgIndex = 0; // 单条记录内的图片索引
 
 // ===== Banner 数据（内嵌图片） =====
 var bannerSlides = [
@@ -687,6 +699,14 @@ function showVenueInfo(venue) {
     document.getElementById('seatmapContainer').innerHTML = '<div class="seatmap-placeholder">座位图暂缺</div>';
   }
 
+  var arrivalWrap = document.getElementById('venueArrivalWrap');
+  if (venue.arrival) {
+    document.getElementById('venueArrival').textContent = venue.arrival;
+    arrivalWrap.style.display = 'flex';
+  } else {
+    arrivalWrap.style.display = 'none';
+  }
+
       document.getElementById('venueInfoSection').style.display = 'block';
       document.getElementById('viewResultSection').style.display = 'none';
 }
@@ -696,11 +716,28 @@ function renderCarousel() {
   var match = carouselMatches[carouselIndex];
   var f = match.fields || {};
   var imgs = f['图片'] || [];
-  var fileToken = imgs.length > 0 ? (imgs[0].file_token || '') : '';
+
+  // 图片内索引越界时重置
+  if (carouselImgIndex >= imgs.length) carouselImgIndex = 0;
+
+  var fileToken = imgs.length > 0 ? (imgs[carouselImgIndex].file_token || '') : '';
   var imgUrl = fileToken ? '/img/' + fileToken : '';
 
   if (imgUrl) {
-    viewImage.innerHTML = '<img src="' + imgUrl + '" alt="视角" onerror="this.parentElement.innerHTML=\'<div class=\\\'view-image-placeholder\\\'>图片加载失败</div>\'">';
+    var html = '<img src="' + imgUrl + '" alt="视角" onerror="this.parentElement.innerHTML=\'<div class=\\\'view-image-placeholder\\\'>图片加载失败</div>\'">';
+    // 多条记录间的导航
+    if (carouselMatches.length > 1) {
+      html += '<button onclick="navigateCarousel(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.9);border:1.5px solid var(--border);cursor:pointer;z-index:2">◀</button>';
+      html += '<button onclick="navigateCarousel(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.9);border:1.5px solid var(--border);cursor:pointer;z-index:2">▶</button>';
+    }
+    // 单条记录内多张图片的导航
+    if (imgs.length > 1) {
+      html += '<button onclick="navigateRecordImg(-1)" style="position:absolute;left:8px;bottom:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;cursor:pointer;z-index:2;font-size:14px">‹</button>';
+      html += '<button onclick="navigateRecordImg(1)" style="position:absolute;right:8px;bottom:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;cursor:pointer;z-index:2;font-size:14px">›</button>';
+      html += '<div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;z-index:2">' + (carouselImgIndex + 1) + '/' + imgs.length + '</div>';
+    }
+    viewImage.style.position = 'relative';
+    viewImage.innerHTML = html;
   } else {
     viewImage.innerHTML = '<div class="view-image-placeholder">暂无图片</div>';
   }
@@ -713,40 +750,80 @@ function renderCarousel() {
   document.getElementById('viewTags').innerHTML = '<span class="tag active-tag">' + escapeHtml(currentVenue ? currentVenue.name : '') + '</span><span class="tag">' + escapeHtml(section) + '</span>' + (row ? '<span class="tag">' + escapeHtml(row) + '</span>' : '') + (carouselMatches.length > 1 ? '<span class="tag" style="color:var(--primary)">' + (carouselIndex + 1) + '/' + carouselMatches.length + '</span>' : '');
   document.getElementById('viewDesc').textContent = desc || '暂无描述';
   document.getElementById('viewMeta').textContent = uploadTime;
-
-  // 导航按钮
-  if (carouselMatches.length > 1) {
-    var navHtml = '';
-    if (carouselIndex > 0) navHtml += '<button onclick="navigateCarousel(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.9);border:1.5px solid var(--border);cursor:pointer">◀</button>';
-    if (carouselIndex < carouselMatches.length - 1) navHtml += '<button onclick="navigateCarousel(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.9);border:1.5px solid var(--border);cursor:pointer">▶</button>';
-    viewImage.style.position = 'relative';
-    viewImage.insertAdjacentHTML('beforeend', navHtml);
-  }
 }
 
 function navigateCarousel(dir) {
+  carouselImgIndex = 0;
   carouselIndex = Math.max(0, Math.min(carouselMatches.length - 1, carouselIndex + dir));
   renderCarousel();
 }
 
-// ===== 文件选择 =====
-function handleFileSelect(event) {
-  var file = event.target.files[0];
-  if (!file) return;
-  selectedFile = file;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById('upImg').src = e.target.result;
-    document.getElementById('fileSelector').classList.add('has-file');
-  };
-  reader.readAsDataURL(file);
+function navigateRecordImg(dir) {
+  var imgs = carouselMatches[carouselIndex].fields['图片'] || [];
+  carouselImgIndex = Math.max(0, Math.min(imgs.length - 1, carouselImgIndex + dir));
+  renderCarousel();
 }
 
-function removeFile(event) {
+// ===== 文件选择（支持多张，最多 3 张） =====
+var MAX_FILES = 3;
+
+function handleFileSelect(event) {
+  var newFiles = Array.from(event.target.files);
+  if (newFiles.length === 0) return;
+
+  // 合并到现有文件，限制最多 MAX_FILES 张
+  var remaining = MAX_FILES - selectedFiles.length;
+  if (remaining <= 0) {
+    showToast('最多只能上传 ' + MAX_FILES + ' 张图片');
+    event.target.value = '';
+    return;
+  }
+  var toAdd = newFiles.slice(0, remaining);
+  if (newFiles.length > remaining) {
+    showToast('最多 ' + MAX_FILES + ' 张，已自动截取前 ' + remaining + ' 张');
+  }
+
+  toAdd.forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      selectedFiles.push({ file: file, dataUrl: e.target.result });
+      renderFilePreview();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // 清空 input 以便可以重复选择相同文件
+  event.target.value = '';
+}
+
+function renderFilePreview() {
+  var grid = document.getElementById('filePreviewGrid');
+  var counter = document.getElementById('fileCounter');
+  var selector = document.getElementById('fileSelector');
+
+  if (selectedFiles.length === 0) {
+    grid.innerHTML = '';
+    counter.textContent = '';
+    selector.classList.remove('has-file');
+    return;
+  }
+
+  selector.classList.add('has-file');
+  counter.textContent = '已选择 ' + selectedFiles.length + '/' + MAX_FILES + ' 张';
+
+  grid.innerHTML = selectedFiles.map(function(item, idx) {
+    return '<div class="preview-item">' +
+      '<img src="' + item.dataUrl + '" alt="预览">' +
+      '<div class="preview-remove" onclick="removeFile(event, ' + idx + ')">' +
+      '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>' +
+      '</div></div>';
+  }).join('');
+}
+
+function removeFile(event, idx) {
   event.stopPropagation();
-  selectedFile = null;
-  document.getElementById('fileSelector').classList.remove('has-file');
-  document.getElementById('upFile').value = '';
+  selectedFiles.splice(idx, 1);
+  renderFilePreview();
 }
 
 // ===== 上传 =====
@@ -759,7 +836,7 @@ async function doUpload() {
 
   if (!venue) { showToast('请选择场馆'); return; }
   if (!area) { showToast('请填写区域'); return; }
-  if (!selectedFile) { showToast('请选择图片'); return; }
+  if (selectedFiles.length === 0) { showToast('请选择图片'); return; }
 
   var btn = document.getElementById('upBtn');
   var progress = document.getElementById('uploadProgress');
@@ -777,22 +854,25 @@ async function doUpload() {
   }, 300);
 
   try {
-    // 1. 上传图片
-    var imgData = document.getElementById('upImg').src;
-    var fileName = selectedFile.name || 'upload.jpg';
-    text.textContent = '上传图片...';
+    // 1. 逐张上传图片，收集所有 file_token
+    var fileTokens = [];
+    for (var i = 0; i < selectedFiles.length; i++) {
+      var item = selectedFiles[i];
+      text.textContent = '上传图片 ' + (i + 1) + '/' + selectedFiles.length + '...';
 
-    var uploadRes = await fetch('/api/upload', {
-      method: 'POST', headers: getHeaders(), body: JSON.stringify({ image: imgData, fileName: fileName })
-    });
-    var uploadData = await uploadRes.json();
-    if (uploadData.error) throw new Error('上传失败: ' + uploadData.error);
+      var uploadRes = await fetch('/api/upload', {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify({ image: item.dataUrl, fileName: item.file.name || 'upload.jpg' })
+      });
+      var uploadData = await uploadRes.json();
+      if (uploadData.error) throw new Error('上传失败: ' + uploadData.error);
+      if (uploadData.fileToken) fileTokens.push({ file_token: uploadData.fileToken });
+    }
 
     fill.style.width = '70%';
     text.textContent = '创建记录...';
 
-    // 2. 创建记录
-    var venueName = currentVenue ? currentVenue.name : '';
+    // 2. 创建记录（直接用上传页 hidden input 的场馆名，不依赖 currentVenue）
+    var venueName = venue;
     var recordData = {
       fields: {
         '场馆': venueName,
@@ -800,7 +880,7 @@ async function doUpload() {
         '排/座位号': row ? (row + '排' + (seat ? seat + '号' : '')) : (seat ? seat + '号' : ''),
         '视角描述': desc || '用户上传的演唱会现场视角',
         '艺人': '',
-        '图片': uploadData.fileToken ? [{ file_token: uploadData.fileToken }] : [],
+        '图片': fileTokens,
         '上传时间': new Date().toISOString().split('T')[0],
       }
     };
@@ -823,7 +903,8 @@ async function doUpload() {
       document.getElementById('upDesc').value = '';
       document.getElementById('upVenue').value = '';
       document.getElementById('upVenueInput').value = '';
-      removeFile(new Event('click'));
+      selectedFiles = [];
+      renderFilePreview();
       showToast('提交成功，等待管理员审核后展示');
     }, 1500);
 
