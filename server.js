@@ -317,7 +317,10 @@ const server = http.createServer(async (req, res) => {
     try {
       const redirectUri = `${getOrigin(req)}/auth/callback`;
       await exchangeCodeForTokens(code, redirectUri);
-      res.writeHead(302, { Location: '/?login=success' });
+      // 保留 state 参数，支持 setup 页面回调
+      const state = urlObj.searchParams.get('state') || '';
+      const redirectPath = state === 'setup_v1.1' ? '/setup.html?login=success' : '/?login=success';
+      res.writeHead(302, { Location: redirectPath });
       res.end();
     } catch (e) {
       console.error('[OAuth] 回调失败:', e.message);
