@@ -1,4 +1,11 @@
-<!DOCTYPE html>
+// update_index_v1.1.js
+// 生成 v1.1 版本的 index.html 并替换 deploy/static/index.html
+// 包含完整的前后端对接
+
+const fs = require('fs');
+const path = require('path');
+
+const indexHtml = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -510,7 +517,7 @@ function setupVenueDropdown(inputId, dropdownId, hiddenId, onSelect) {
 
 function renderVenueDropdown(dropdown, hidden, onSelect) {
   dropdown.innerHTML = venues.map(function(v) {
-    return '<div class="dropdown-item" onclick="selectVenue('' + v.id + '','' + dropdown.id + '','' + hidden.id + '')"><div class="dropdown-item-title">' + escapeHtml(v.name) + '</div><div class="dropdown-item-meta">' + escapeHtml(v.city) + ' · ' + escapeHtml(v.capacity) + '</div></div>';
+    return '<div class="dropdown-item" onclick="selectVenue(\'' + v.id + '\',\'' + dropdown.id + '\',\'' + hidden.id + '\')"><div class="dropdown-item-title">' + escapeHtml(v.name) + '</div><div class="dropdown-item-meta">' + escapeHtml(v.city) + ' · ' + escapeHtml(v.capacity) + '</div></div>';
   }).join('');
 }
 
@@ -557,7 +564,7 @@ function showVenueInfo(venue) {
       records.forEach(function(rec) {
         var f = rec.fields || {};
         var section = f['区域'] || '';
-        var m = section.match(/(\d+)/);
+        var m = section.match(/(\\d+)/);
         var zoneKey = m ? m[1] : section;
         if (!zoneMap[zoneKey]) zoneMap[zoneKey] = { count: 0, hasImg: false };
         zoneMap[zoneKey].count++;
@@ -568,7 +575,7 @@ function showVenueInfo(venue) {
       var grid = document.getElementById('zoneGrid');
       grid.innerHTML = sortedZones.map(function(z) {
         var zd = zoneMap[z];
-        return '<div class="zone-chip" onclick="selectZone('' + z + '')" style="' + (zd.hasImg ? 'border-color:var(--primary)' : '') + '"><div>' + z + '区</div><div class="zone-count">' + zd.count + '条</div></div>';
+        return '<div class="zone-chip" onclick="selectZone(\'' + z + '\')" style="' + (zd.hasImg ? 'border-color:var(--primary)' : '') + '"><div>' + z + '区</div><div class="zone-count">' + zd.count + '条</div></div>';
       }).join('');
 
       document.getElementById('venueInfoSection').style.display = 'block';
@@ -598,7 +605,7 @@ function showViewResult(zone) {
       var matches = records.filter(function(rec) {
         var f = rec.fields || {};
         var s = f['区域'] || '';
-        var m = s.match(/(\d+)/);
+        var m = s.match(/(\\d+)/);
         return m && m[1] === zone;
       });
 
@@ -625,7 +632,7 @@ function renderCarousel() {
   var imgUrl = fileToken ? '/img/' + fileToken : '';
 
   if (imgUrl) {
-    viewImage.innerHTML = '<img src="' + imgUrl + '" alt="视角" onerror="this.parentElement.innerHTML=\'<div class=\\\'view-image-placeholder\\\'>图片加载失败</div>\'">';
+    viewImage.innerHTML = '<img src="' + imgUrl + '" alt="视角" onerror="this.parentElement.innerHTML=\\'<div class=\\\\\\'view-image-placeholder\\\\\\'>图片加载失败</div>\\'">';
   } else {
     viewImage.innerHTML = '<div class="view-image-placeholder">暂无图片</div>';
   }
@@ -779,4 +786,74 @@ setupVenueDropdown('venueInput', 'venueDropdown', 'venue', null);
 setupVenueDropdown('upVenueInput', 'upVenueDropdown', 'upVenue', null);
 </script>
 </body>
-</html>
+</html>`;
+
+// 添加后端 API 到 server.js
+const serverJsPath = path.join(__dirname, 'server.js');
+let serverContent = fs.readFileSync(serverJsPath, 'utf-8');
+
+// 检查是否已添加 /api/banner/list 和 /api/venues/list
+if (!serverContent.includes("'/api/banner/list'")) {
+  const apiEndpoints = `
+      // ===== Banner 列表 =====
+      if (pathname === '/api/banner/list' && req.method === 'GET') {
+        const BANNER_TABLE = 'tblOJkxHGDx9Swqk';
+        const all = [];
+        let pageToken = null;
+        do {
+          let p = '/bitable/v1/apps/' + CONFIG.baseId + '/tables/' + BANNER_TABLE + '/records?page_size=100';
+          if (pageToken) p += '&page_token=' + pageToken;
+          const data = await feishuRequest('GET', p);
+          all.push(...(data.data?.items || []));
+          if (!data.data?.has_more) break;
+          pageToken = data.data?.page_token || null;
+        } while (true);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ records: all }));
+        return;
+      }
+
+      // ===== Venues 列表 =====
+      if (pathname === '/api/venues/list' && req.method === 'GET') {
+        const VENUES_TABLE = 'tblKw40knld48WpO';
+        const all = [];
+        let pageToken = null;
+        do {
+          let p = '/bitable/v1/apps/' + CONFIG.baseId + '/tables/' + VENUES_TABLE + '/records?page_size=100';
+          if (pageToken) p += '&page_token=' + pageToken;
+          const data = await feishuRequest('GET', p);
+          all.push(...(data.data?.items || []));
+          if (!data.data?.has_more) break;
+          pageToken = data.data?.page_token || null;
+        } while (true);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ records: all }));
+        return;
+      }
+`;
+
+  // 插入在 /api/upload 之前
+  serverContent = serverContent.replace(
+    "if (pathname === '/api/upload' && req.method === 'POST') {",
+    apiEndpoints.trim() + "\n\n      if (pathname === '/api/upload' && req.method === 'POST') {"
+  );
+
+  fs.writeFileSync(serverJsPath, serverContent, 'utf-8');
+  console.log('[Server] 已添加 /api/banner/list 和 /api/venues/list 接口');
+}
+
+// 写入 index.html
+const indexPath = path.join(__dirname, 'static', 'index.html');
+fs.writeFileSync(indexPath, indexHtml, 'utf-8');
+console.log('[Frontend] 已更新 index.html 为 v1.1 版本');
+
+// 清理临时文件
+const tempFiles = ['index-v1.1.html', 'setup.html', 'upload_banner_images.js', 'fix_banner_records.js', 'create_banner_table.js'];
+tempFiles.forEach(function(f) {
+  var p = path.join(__dirname, 'static', f);
+  if (fs.existsSync(p)) { fs.unlinkSync(p); console.log('[Clean] 删除: ' + f); }
+  var p2 = path.join(__dirname, f);
+  if (fs.existsSync(p2)) { fs.unlinkSync(p2); console.log('[Clean] 删除: ' + f); }
+});
+
+console.log('\n✅ v1.1 前端+后端更新完成！');

@@ -457,6 +457,42 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      // ===== Banner 列表 =====
+      if (pathname === '/api/banner/list' && req.method === 'GET') {
+        const BANNER_TABLE = 'tblOJkxHGDx9Swqk';
+        const all = [];
+        let pageToken = null;
+        do {
+          let p = '/bitable/v1/apps/' + CONFIG.baseId + '/tables/' + BANNER_TABLE + '/records?page_size=100';
+          if (pageToken) p += '&page_token=' + pageToken;
+          const data = await feishuRequest('GET', p);
+          all.push(...(data.data?.items || []));
+          if (!data.data?.has_more) break;
+          pageToken = data.data?.page_token || null;
+        } while (true);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ records: all }));
+        return;
+      }
+
+      // ===== Venues 列表 =====
+      if (pathname === '/api/venues/list' && req.method === 'GET') {
+        const VENUES_TABLE = 'tblKw40knld48WpO';
+        const all = [];
+        let pageToken = null;
+        do {
+          let p = '/bitable/v1/apps/' + CONFIG.baseId + '/tables/' + VENUES_TABLE + '/records?page_size=100';
+          if (pageToken) p += '&page_token=' + pageToken;
+          const data = await feishuRequest('GET', p);
+          all.push(...(data.data?.items || []));
+          if (!data.data?.has_more) break;
+          pageToken = data.data?.page_token || null;
+        } while (true);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ records: all }));
+        return;
+      }
+
       if (pathname === '/api/upload' && req.method === 'POST') {
         if (!json || !json.image) throw new Error('No image data');
         const result = await uploadImage(json.image, json.fileName);
