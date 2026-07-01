@@ -33,29 +33,43 @@ let appTokenExpiresAt = 0;
 
 function loadTokens() {
   try {
-    if (fs.existsSync(TOKEN_STORE)) {
-      const data = JSON.parse(fs.readFileSync(TOKEN_STORE, 'utf-8'));
-      tokenState = { ...tokenState, ...data };
-      console.log('[Token] 已加载 (从文件), 用户:', tokenState.userName || '未知');
-      console.log('[Token] access_token 有效至:', new Date(tokenState.expiresAt).toISOString());
-      console.log('[Token] refresh_token 有效至:', new Date(tokenState.refreshExpiresAt).toISOString());
-    } else {
-      console.log('[Token] 无 token 文件');
-    }
-    // 从环境变量读取（Railway Variables，跨部署持久化）
+    // 优先从环境变量读取（Railway Variables，跨部署持久化）
     const envRefreshToken = process.env.FEISHU_REFRESH_TOKEN;
     const envUserToken = process.env.FEISHU_USER_TOKEN;
-    if (envRefreshToken && !tokenState.refreshToken) {
+    if (envRefreshToken) {
       tokenState.refreshToken = envRefreshToken;
       tokenState.refreshExpiresAt = Date.now() + 30 * 24 * 3600 * 1000; // 30 天
       console.log('[Token] ✅ 从环境变量加载 refresh_token');
     }
-    if (envUserToken && !tokenState.userToken) {
+    if (envUserToken) {
       tokenState.userToken = envUserToken;
       tokenState.expiresAt = Date.now() + 2 * 3600 * 1000; // 2 小时
       tokenState.userName = process.env.FEISHU_USER_NAME || 'Unknown';
-      console.log('[Token] ✅ 从环境变量加载 user_token');
+      console.log('[Token] ✅ 从环境变量加载 user_token, 用户:', tokenState.userName);
     }
+    
+    // 如果环境变量没有，尝试从文件加载
+    if (!tokenState.userToken || !tokenState.refreshToken) {
+      if (fs.existsSync(TOKEN_STORE)) {
+        const data = JSON.parse(fs.readFileSync(TOKEN_STORE, 'utf-8'));
+        if (!tokenState.userToken && data.userToken) {
+          tokenState.userToken = data.userToken;
+          tokenState.expiresAt = data.expiresAt || Date.now() + 2 * 3600 * 1000;
+          console.log('[Token] 从文件加载 user_token');
+        }
+        if (!tokenState.refreshToken && data.refreshToken) {
+          tokenState.refreshToken = data.refreshToken;
+          tokenState.refreshExpiresAt = data.refreshExpiresAt || Date.now() + 30 * 24 * 3600 * 1000;
+          console.log('[Token] 从文件加载 refresh_token');
+        }
+        if (data.userName && !tokenState.userName) {
+          tokenState.userName = data.userName;
+        }
+      } else {
+        console.log('[Token] 无 token 文件');
+      }
+    }
+    
     if (!tokenState.userToken && !tokenState.refreshToken) {
       console.log('[Token] 需要通过 OAuth 登录');
     }
@@ -370,6 +384,25 @@ const server = http.createServer(async (req, res) => {
       userName: tokenState.userName || '',
       expiresAt: tokenState.expiresAt,
       refreshExpiresAt: tokenState.refreshExpiresAt,
+    }));
+    return;
+  }
+
+  // ===== 临时 API：导出 token（用于设置 Railway Variables） =====
+  if (pathname === '/api/debug/export-tokens' && req.method === 'GET') {
+    const inviteCode = req.headers['x-invite-code'];
+    if (inviteCode !== CONFIG.inviteCode) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '无效的邀请码' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      FEISHU_USER_TOKEN: tokenState.userToken || '',
+      FEISHU_REFRESH_TOKEN: tokenState.refreshToken || '',
+      FEISHU_USER_NAME: tokenState.userName || '',
+      hint: '请将以上值复制到 Railway Variables 中',
     }));
     return;
   }
