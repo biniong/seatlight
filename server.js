@@ -8,6 +8,7 @@ const CONFIG = {
   appSecret: process.env.FEISHU_APP_SECRET || '',
   baseId: process.env.FEISHU_BASE_ID || '',
   tableId: process.env.FEISHU_TABLE_ID || '',
+  pendingTableId: process.env.FEISHU_PENDING_TABLE_ID || 'tbldisTDeUoTkptM',
   inviteCode: process.env.INVITE_CODE || 'seatlight2026',
   port: parseInt(process.env.PORT || '3000'),
 };
@@ -198,6 +199,18 @@ async function createRecord(fields) {
   return data.data?.record;
 }
 
+async function createPendingRecord(fields) {
+  console.log('[CreatePendingRecord] fields:', JSON.stringify(fields));
+  // 添加审核状态
+  fields['审核状态'] = '待审核';
+  fields['上传时间'] = Date.now();
+  const data = await feishuRequest('POST',
+    `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records`,
+    { fields }, true); // 使用 app token
+  console.log('[CreatePendingRecord] response:', JSON.stringify(data));
+  return data.data?.record;
+}
+
 async function uploadImage(base64Data, fileName) {
   const token = getUserToken();
   const matches = base64Data.match(/^data:(image\/\w+);base64,(.+)$/);
@@ -342,46 +355,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 临时 API：创建待审核表（完成后删除）
-  if (pathname === '/api/create-pending-table' && req.method === 'POST') {
-    try {
-      const token = getUserToken();
-      const fetchRes = await fetch('https://open.feishu.cn/open-apis/bitable/v1/apps/' + CONFIG.baseId + '/tables', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table: {
-            name: '待审核记录',
-            default_view_name: '待审核视图',
-            fields: [
-              { field_name: '场馆', type: 1 },
-              { field_name: '区域', type: 1 },
-              { field_name: '排/座位号', type: 1 },
-              { field_name: '视角描述', type: 1 },
-              { field_name: '艺人', type: 1 },
-              { field_name: '图片', type: 17 },
-              { field_name: '上传时间', type: 5 },
-              { field_name: '审核状态', type: 3, property: { options: [
-                { name: '待审核' },
-                { name: '已通过' },
-                { name: '已拒绝' }
-              ]}},
-              { field_name: '审核时间', type: 5 },
-              { field_name: '审核备注', type: 1 }
-            ]
-          }
-        })
-      });
-      const data = await fetchRes.json();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(data));
-    } catch (e) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: e.message }));
-    }
-    return;
-  }
-
   // ===== 邀请码验证 =====
   if (pathname === '/api/invite/check' && req.method === 'POST') {
     let body = '';
@@ -461,9 +434,9 @@ const server = http.createServer(async (req, res) => {
 
       if (pathname === '/api/records' && req.method === 'POST') {
         if (!json) throw new Error('No body');
-        const record = await createRecord(json.fields);
+        const record = await createPendingRecord(json.fields);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ record }));
+        res.end(JSON.stringify({ record, pending: true }));
         return;
       }
 
@@ -499,6 +472,68 @@ const server = http.createServer(async (req, res) => {
           }});
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, record: recordData.data?.record }));
+        return;
+      }
+
+      // ===== 待审核记录列表 =====
+      if (pathname === '/api/pending/list' && req.method === 'GET') {
+        const all = [];
+        let pageToken = null;
+        do {
+          let p = `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records?page_size=100`;
+          if (pageToken) p += '&page_token=' + pageToken;
+          const data = await feishuRequest('GET', p, null, true);
+          all.push(...(data.data?.items || []));
+          if (!data.data?.has_more) break;
+          pageToken = data.data?.page_token || null;
+        } while (true);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ records: all }));
+        return;
+      }
+
+      // ===== 审核同步（将已通过记录复制到正式表） =====
+      if (pathname === '/api/pending/sync' && req.method === 'POST') {
+        // 查询所有已通过审核的记录
+        const pendingRecords = [];
+        let pageToken = null;
+        do {
+          let p = `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records?page_size=100`;
+          if (pageToken) p += '&page_token=' + pageToken;
+          const data = await feishuRequest('GET', p, null, true);
+          pendingRecords.push(...(data.data?.items || []));
+          if (!data.data?.has_more) break;
+          pageToken = data.data?.page_token || null;
+        } while (true);
+
+        // 筛选已通过审核的记录（审核状态为"已通过"）
+        const approvedRecords = pendingRecords.filter(r => 
+          r.fields['审核状态'] === '已通过'
+        );
+
+        let syncedCount = 0;
+        for (const record of approvedRecords) {
+          try {
+            // 复制到正式表
+            const fields = { ...record.fields };
+            delete fields['审核状态'];
+            delete fields['审核时间'];
+            delete fields['审核备注'];
+            await createRecord(fields);
+
+            // 同步成功后，删除待审核表中的记录
+            await feishuRequest('DELETE',
+              `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records/${record.record_id}`,
+              null, true);
+
+            syncedCount++;
+          } catch (e) {
+            console.error('[Sync] 同步失败:', record.record_id, e.message);
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, synced: syncedCount }));
         return;
       }
 

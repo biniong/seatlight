@@ -810,7 +810,7 @@ async function doUpload() {
     if (recordResult.error) throw new Error(recordResult.error);
 
     fill.style.width = '100%';
-    text.textContent = '上传成功！';
+    text.textContent = '提交成功！';
 
     setTimeout(function() {
       btn.disabled = false;
@@ -824,7 +824,7 @@ async function doUpload() {
       document.getElementById('upVenue').value = '';
       document.getElementById('upVenueInput').value = '';
       removeFile(new Event('click'));
-      showToast('视角已提交');
+      showToast('提交成功，等待管理员审核后展示');
     }, 1500);
 
   } catch (err) {
