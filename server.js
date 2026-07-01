@@ -13,7 +13,9 @@ const CONFIG = {
   port: parseInt(process.env.PORT || '3000'),
 };
 
-const TOKEN_STORE = path.join(__dirname, 'token_store.json');
+// Token 存储路径：优先使用 Railway 持久化存储卷
+const DATA_DIR = fs.existsSync('/data') ? '/data' : __dirname;
+const TOKEN_STORE = path.join(DATA_DIR, 'token_store.json');
 const STATIC_DIR = path.join(__dirname, 'static');
 const FRONTEND_DIR = path.join(__dirname, 'frontend');
 
@@ -687,9 +689,56 @@ server.listen(CONFIG.port, () => {
   console.log('═══════════════════════════════════════');
   console.log('  🎵 SeatLight Server');
   console.log(`  🌐 http://localhost:${CONFIG.port}`);
-  console.log(`  📋 Base: ${CONFIG.baseId}`);
+  console.log(`   Base: ${CONFIG.baseId}`);
   console.log(`  📊 Table: ${CONFIG.tableId}`);
   console.log(`  🔑 Invite: ${CONFIG.inviteCode}`);
   console.log('═══════════════════════════════════════');
   console.log('');
 });
+
+// ===== 自动审核同步（每 5 分钟检查一次） =====
+async function autoSyncPendingRecords() {
+  try {
+    const token = getUserToken();
+    if (!token) {
+      console.log('[AutoSync] 无用户 token，跳过同步');
+      return;
+    }
+    const pendingRecords = [];
+    let pageToken = null;
+    do {
+      let p = `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records?page_size=100`;
+      if (pageToken) p += '&page_token=' + pageToken;
+      const data = await feishuRequest('GET', p, null, false);
+      pendingRecords.push(...(data.data?.items || []));
+      if (!data.data?.has_more) break;
+      pageToken = data.data?.page_token || null;
+    } while (true);
+    const approvedRecords = pendingRecords.filter(r => r.fields['审核状态'] === '已通过');
+    if (approvedRecords.length === 0) return;
+    let syncedCount = 0;
+    for (const record of approvedRecords) {
+      try {
+        const fields = { ...record.fields };
+        delete fields['审核状态'];
+        delete fields['审核时间'];
+        delete fields['审核备注'];
+        await createRecord(fields);
+        await feishuRequest('DELETE',
+          `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records/${record.record_id}`,
+          null, false);
+        syncedCount++;
+        console.log(`[AutoSync] ✅ 已同步: ${record.record_id}`);
+      } catch (e) {
+        console.error(`[AutoSync] 同步失败: ${record.record_id}`, e.message);
+      }
+    }
+    console.log(`[AutoSync] 🔄 本次同步 ${syncedCount} 条已通过记录`);
+  } catch (e) {
+    console.log('[AutoSync] 跳过:', e.message);
+  }
+}
+
+setTimeout(() => { console.log('[AutoSync] 首次同步...'); autoSyncPendingRecords(); }, 60000);
+setInterval(autoSyncPendingRecords, 5 * 60 * 1000);
+console.log('[AutoSync] 每 5 分钟自动同步已通过审核的记录');
