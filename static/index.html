@@ -767,6 +767,34 @@ function navigateRecordImg(dir) {
 // ===== 文件选择（支持多张，最多 3 张） =====
 var MAX_FILES = 3;
 
+// 用 Canvas 强制将图片转换为真正的 JPEG（解决 iPhone HEIF 文件名.jpeg 但内容非 JPEG 的问题）
+function imageToJpeg(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        var jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        var base64 = jpegDataUrl.split(',')[1];
+        resolve({
+          dataUrl: jpegDataUrl,
+          base64: base64,
+          fileName: (file.name || 'upload.jpg').replace(/\.(heic|heif)$/i, '.jpg')
+        });
+      };
+      img.onerror = function() { reject(new Error('无法加载图片')); };
+      img.src = e.target.result;
+    };
+    reader.onerror = function() { reject(new Error('读取文件失败')); };
+    reader.readAsDataURL(file);
+  });
+}
+
 function handleFileSelect(event) {
   var newFiles = Array.from(event.target.files);
   if (newFiles.length === 0) return;
@@ -783,13 +811,22 @@ function handleFileSelect(event) {
     showToast('最多 ' + MAX_FILES + ' 张，已自动截取前 ' + remaining + ' 张');
   }
 
+  // 逐张转换（统一转为真实 JPEG，兼容 iPhone HEIF）
+  var pending = toAdd.length;
   toAdd.forEach(function(file) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      selectedFiles.push({ file: file, dataUrl: e.target.result });
-      renderFilePreview();
-    };
-    reader.readAsDataURL(file);
+    imageToJpeg(file).then(function(result) {
+      selectedFiles.push({
+        file: { name: result.fileName },
+        dataUrl: result.dataUrl,
+        base64: result.base64
+      });
+      pending--;
+      if (pending === 0) renderFilePreview();
+    }).catch(function(err) {
+      showToast('图片转换失败: ' + err.message);
+      pending--;
+      if (pending === 0) renderFilePreview();
+    });
   });
 
   // 清空 input 以便可以重复选择相同文件
