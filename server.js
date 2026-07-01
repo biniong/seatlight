@@ -234,7 +234,7 @@ async function uploadImage(base64Data, fileName) {
 // ===== 图片代理：用服务端 token 下载飞书图片，转发给前端 =====
 async function proxyFeishuImage(fileToken, res) {
   try {
-    const token = getUserToken();
+    const token = await getAppAccessToken();
     const imgRes = await fetch(`https://open.feishu.cn/open-apis/drive/v1/medias/${fileToken}/download`, {
       headers: { 'Authorization': 'Bearer ' + token },
       redirect: 'follow',

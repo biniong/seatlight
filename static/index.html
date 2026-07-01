@@ -235,7 +235,34 @@
         </div>
       </div>
 
-      <!-- 区域选择 -->
+      <!-- 筛选条件 -->
+      <div class="card">
+        <div class="card-title"><svg class="card-icon"><use href="#icon-filter"></use></svg>筛选视角</div>
+        
+        <div class="form-group">
+          <label class="form-label">区域</label>
+          <select class="form-input" id="filterZone">
+            <option value="">全部区域</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">排</label>
+            <input class="form-input" id="filterRow" placeholder="如：10" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label">座位号</label>
+            <input class="form-input" id="filterSeat" placeholder="如：4" autocomplete="off">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="applyFilter()">
+          <svg class="btn-icon"><use href="#icon-search"></use></svg>查询
+        </button>
+      </div>
+
+      <!-- 区域选择（保留原有网格） -->
       <div class="card">
         <div class="card-title"><svg class="card-icon"><use href="#icon-zone"></use></svg>选择区域</div>
         <div class="zone-grid" id="zoneGrid"></div>
@@ -335,6 +362,7 @@
   <symbol id="icon-view" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></symbol>
   <symbol id="icon-image" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></symbol>
   <symbol id="icon-key" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></symbol>
+  <symbol id="icon-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
 </svg>
 
 <script>
@@ -571,6 +599,14 @@ function showVenueInfo(venue) {
         return '<div class="zone-chip" onclick="selectZone('' + z + '')" style="' + (zd.hasImg ? 'border-color:var(--primary)' : '') + '"><div>' + z + '区</div><div class="zone-count">' + zd.count + '条</div></div>';
       }).join('');
 
+      // 填充区域筛选下拉框
+      var filterZone = document.getElementById('filterZone');
+      if (filterZone) {
+        filterZone.innerHTML = '<option value="">全部区域</option>' + sortedZones.map(function(z) {
+          return '<option value="' + z + '">' + z + '区</option>';
+        }).join('');
+      }
+
       document.getElementById('venueInfoSection').style.display = 'block';
       document.getElementById('viewResultSection').style.display = 'none';
     });
@@ -769,6 +805,65 @@ function escapeHtml(str) {
   var div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ===== 应用筛选 =====
+function applyFilter() {
+  var zone = document.getElementById('filterZone').value;
+  var row = document.getElementById('filterRow').value.trim();
+  var seat = document.getElementById('filterSeat').value.trim();
+
+  if (!currentVenue) {
+    showToast('请先选择场馆');
+    return;
+  }
+
+  var section = document.getElementById('viewResultSection');
+  section.style.display = 'block';
+  var viewImage = document.getElementById('viewImage');
+  viewImage.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  fetch('/api/records', { headers: getHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var records = data.records || [];
+      var matches = records.filter(function(rec) {
+        var f = rec.fields || {};
+        var venueField = f['场馆'] || '';
+        if (currentVenue && venueField.indexOf(currentVenue.name) === -1) return false;
+
+        if (zone) {
+          var zoneField = f['区域'] || '';
+          var zoneMatch = zoneField.match(/(\d+)/);
+          if (!zoneMatch || zoneMatch[1] !== zone) return false;
+        }
+
+        if (row || seat) {
+          var rowSeat = f['排/座位号'] || '';
+          if (row && rowSeat.indexOf(row + '排') === -1) return false;
+          if (seat && rowSeat.indexOf(seat + '号') === -1) return false;
+        }
+
+        return true;
+      });
+
+      if (matches.length > 0) {
+        carouselMatches = matches;
+        carouselIndex = 0;
+        renderCarousel();
+      } else {
+        viewImage.innerHTML = '<div class="view-image-placeholder">未找到匹配的视角</div>';
+        var tags = [];
+        tags.push('<span class="tag">' + escapeHtml(currentVenue.name) + '</span>');
+        if (zone) tags.push('<span class="tag">' + zone + '区</span>');
+        if (row) tags.push('<span class="tag">' + escapeHtml(row) + '排</span>');
+        if (seat) tags.push('<span class="tag">' + escapeHtml(seat) + '号</span>');
+        document.getElementById('viewTags').innerHTML = tags.join('');
+        document.getElementById('viewDesc').textContent = '未找到匹配的视角';
+        document.getElementById('viewMeta').textContent = '';
+      }
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 }
 
 // ===== 初始化 =====
