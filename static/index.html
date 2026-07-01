@@ -442,16 +442,14 @@ function showToast(msg) {
 // ===== 加载初始数据 =====
 function loadInitialData() {
   renderBanner(); // 先用本地 fallback 渲染
-  loadBannerFromApi(); // 再尝试从飞书表格加载
   loadVenueData();
 }
 
-// ===== Banner 从飞书表格加载（失败则保留本地 fallback） =====
+// ===== Banner 从飞书表格加载（无需邀请码，5s 超时回退本地） =====
 function loadBannerFromApi() {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
-
-  fetch('/api/banner/list', { signal: controller.signal })
+  fetch('/api/banner/list', {
+    signal: AbortSignal.timeout(5000)
+  })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.records && data.records.length > 0) {
@@ -465,11 +463,13 @@ function loadBannerFromApi() {
             imgUrl: imgToken ? '/img/' + imgToken : ''
           };
         }).filter(function(s) { return s.imgUrl; });
-        if (bannerSlides.length > 0) renderBanner();
+        if (bannerSlides.length > 0) {
+          currentSlideIndex = 0;
+          renderBanner();
+        }
       }
     })
-    .catch(function() { /* 超时或网络失败，保留本地 fallback */ })
-    .finally(function() { clearTimeout(timeout); });
+    .catch(function() { /* 超时或失败，保留本地 fallback */ });
 }
 
 // ===== Banner 轮播（内嵌图片） =====
@@ -858,8 +858,10 @@ function resetFilter() {
 }
 
 // ===== 初始化 =====
-// Banner 是硬编码数据，页面加载时立即渲染
+// 立即渲染本地 Banner fallback
 renderBanner();
+// 页面加载后自动尝试从飞书表格加载 Banner（5s 超时回退本地）
+loadBannerFromApi();
 
 // 如果邀请码已验证，加载场馆数据
 if (localStorage.getItem(INVITE_VERIFIED_KEY) === '1' && inviteCode) {
