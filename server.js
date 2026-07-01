@@ -342,6 +342,46 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 临时 API：创建待审核表（完成后删除）
+  if (pathname === '/api/create-pending-table' && req.method === 'POST') {
+    try {
+      const token = getUserToken();
+      const res = await fetch('https://open.feishu.cn/open-apis/bitable/v1/apps/' + CONFIG.baseId + '/tables', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: {
+            name: '待审核记录',
+            default_view_name: '待审核视图',
+            fields: [
+              { field_name: '场馆', type: 1 },
+              { field_name: '区域', type: 1 },
+              { field_name: '排/座位号', type: 1 },
+              { field_name: '视角描述', type: 1 },
+              { field_name: '艺人', type: 1 },
+              { field_name: '图片', type: 17 },
+              { field_name: '上传时间', type: 5 },
+              { field_name: '审核状态', type: 3, property: { options: [
+                { name: '待审核' },
+                { name: '已通过' },
+                { name: '已拒绝' }
+              ]}},
+              { field_name: '审核时间', type: 5 },
+              { field_name: '审核备注', type: 1 }
+            ]
+          }
+        })
+      });
+      const data = await res.json();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // ===== 邀请码验证 =====
   if (pathname === '/api/invite/check' && req.method === 'POST') {
     let body = '';
