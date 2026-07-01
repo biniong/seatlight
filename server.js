@@ -513,22 +513,28 @@ const server = http.createServer(async (req, res) => {
 
       // ===== 审核同步（将已通过记录复制到正式表） =====
       if (pathname === '/api/pending/sync' && req.method === 'POST') {
-        // 查询所有已通过审核的记录
+        // 确保 token 有效
+        if (!tokenState.userToken || Date.now() >= tokenState.expiresAt - 120000) {
+          const ok = await refreshTokenIfNeeded();
+          if (!ok) throw new Error('TOKEN_EXPIRED');
+        }
+        // 查询所有待审核记录
         const pendingRecords = [];
         let pageToken = null;
         do {
           let p = `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records?page_size=100`;
           if (pageToken) p += '&page_token=' + pageToken;
-          const data = await feishuRequest('GET', p, null, true);
+          const data = await feishuRequest('GET', p, null, false);
           pendingRecords.push(...(data.data?.items || []));
           if (!data.data?.has_more) break;
           pageToken = data.data?.page_token || null;
         } while (true);
-
-        // 筛选已通过审核的记录（审核状态为"已通过"）
+        console.log('[Sync] 待审核表共', pendingRecords.length, '条记录');
+        // 筛选已通过审核的记录
         const approvedRecords = pendingRecords.filter(r => 
           r.fields['审核状态'] === '已通过'
         );
+        console.log('[Sync] 其中已通过', approvedRecords.length, '条');
 
         let syncedCount = 0;
         for (const record of approvedRecords) {
@@ -543,7 +549,7 @@ const server = http.createServer(async (req, res) => {
             // 同步成功后，删除待审核表中的记录
             await feishuRequest('DELETE',
               `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records/${record.record_id}`,
-              null, true);
+              null, false);
 
             syncedCount++;
           } catch (e) {
