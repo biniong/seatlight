@@ -441,13 +441,40 @@ function showToast(msg) {
 
 // ===== 加载初始数据 =====
 function loadInitialData() {
-  renderBanner();
+  renderBanner(); // 先用本地 fallback 渲染
+  loadBannerFromApi(); // 再尝试从飞书表格加载
   loadVenueData();
 }
 
+// ===== Banner 从飞书表格加载（失败则保留本地 fallback） =====
+function loadBannerFromApi() {
+  fetch('/api/banner/list', { headers: getHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.records && data.records.length > 0) {
+        bannerSlides = data.records.map(function(rec) {
+          var f = rec.fields;
+          var imgToken = (f['图片'] && f['图片'][0]) ? f['图片'][0].file_token : '';
+          return {
+            name: f['演出名称'] || '',
+            time: f['演出时间'] || '',
+            location: f['演出地点'] || '',
+            imgUrl: imgToken ? '/img/' + imgToken : ''
+          };
+        }).filter(function(s) { return s.imgUrl; });
+        if (bannerSlides.length > 0) renderBanner();
+      }
+    })
+    .catch(function() { /* 网络失败，保留本地 fallback */ });
+}
+
 // ===== Banner 轮播（内嵌图片） =====
+var bannerInterval = null;
 function renderBanner() {
   var carousel = document.getElementById('bannerCarousel');
+
+  if (bannerInterval) { clearInterval(bannerInterval); bannerInterval = null; }
+  currentSlideIndex = 0;
 
   if (bannerSlides.length === 0) {
     carousel.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted)">暂无Banner数据</div>';
@@ -466,7 +493,7 @@ function renderBanner() {
   carousel.innerHTML = slidesHtml + '<div class="banner-dots" id="bannerDots">' + dotsHtml + '</div>';
 
   if (bannerSlides.length > 1) {
-    setInterval(function() { goToSlide((currentSlideIndex + 1) % bannerSlides.length); }, 4000);
+    bannerInterval = setInterval(function() { goToSlide((currentSlideIndex + 1) % bannerSlides.length); }, 4000);
   }
 }
 
