@@ -991,10 +991,19 @@ function applyFilter() {
 
         if (zone) {
           var zoneField = f['区域'] || '';
-          // 支持输入 "1" 或 "1区"，都匹配
-          var zoneNum = zone.replace(/[区]/g, '');
-          var zoneMatch = zoneField.match(/(\d+)/);
-          if (!zoneMatch || zoneMatch[1] !== zoneNum) return false;
+          // 支持输入 "6", "6区", "W6", "W6区" 等多种格式，都匹配
+          var zoneNum = zone.replace(/[^\w]/g, '').toUpperCase(); // "W6" 或 "6"
+          var zoneFieldMatch = zoneField.match(/([A-Za-z]*\d+)/); // 提取字母+数字部分，如 "W6"
+          var zoneFieldCode = zoneFieldMatch ? zoneFieldMatch[1].toUpperCase() : '';
+          // 比较：如果用户输入纯数字，只比较数字部分；如果有字母，比较完整编码
+          if (zoneNum.match(/^\d+$/)) {
+            // 纯数字输入，比较数字部分
+            var zoneFieldNum = zoneFieldCode.match(/\d+/);
+            if (!zoneFieldNum || zoneFieldNum[0] !== zoneNum) return false;
+          } else {
+            // 有字母输入，比较完整编码
+            if (zoneFieldCode !== zoneNum) return false;
+          }
         }
 
         if (row || seat) {
