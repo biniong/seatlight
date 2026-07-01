@@ -496,8 +496,11 @@ function renderBanner() {
 
   carousel.innerHTML = slidesHtml + '<div class="banner-dots" id="bannerDots">' + dotsHtml + '</div>';
 
-  // 添加触摸滑动支持
-  setupTouchSwipe(carousel);
+  // 触摸滑动只绑定一次
+  if (!carousel.dataset.swipeBound) {
+    setupTouchSwipe(carousel);
+    carousel.dataset.swipeBound = '1';
+  }
 
   if (bannerSlides.length > 1) {
     bannerInterval = setInterval(function() { goToSlide((currentSlideIndex + 1) % bannerSlides.length); }, 4000);
@@ -509,12 +512,14 @@ function setupTouchSwipe(element) {
   var startX = 0;
   var startY = 0;
   var isTouching = false;
+  var isTouchEvent = false; // 标记是否通过触摸设备交互
 
   // 触摸事件
   element.addEventListener('touchstart', function(e) {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     isTouching = true;
+    isTouchEvent = true; // 标记为触摸设备
   }, { passive: true });
 
   element.addEventListener('touchend', function(e) {
@@ -523,14 +528,16 @@ function setupTouchSwipe(element) {
     handleSwipe(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
   }, { passive: true });
 
-  // 鼠标拖拽事件（桌面端）
+  // 鼠标拖拽事件（桌面端）—— 触摸设备上跳过，避免合成事件导致重复切换
   element.addEventListener('mousedown', function(e) {
+    if (isTouchEvent) return; // 触摸设备不处理鼠标事件
     startX = e.clientX;
     startY = e.clientY;
     isTouching = true;
   });
 
   element.addEventListener('mouseup', function(e) {
+    if (isTouchEvent) return; // 触摸设备不处理鼠标事件
     if (!isTouching) return;
     isTouching = false;
     handleSwipe(e.clientX, e.clientY);
