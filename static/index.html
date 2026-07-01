@@ -40,9 +40,10 @@
 
     /* ===== Tabs ===== */
     .tabs { display: flex; background: var(--white); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
-    .tab { flex: 1; padding: 14px; text-align: center; font-size: 0.92rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; border: none; background: none; position: relative; transition: all 0.2s; }
+    .tab { flex: 1; padding: 14px; text-align: center; font-size: 0.92rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; border: none; background: none; position: relative; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
     .tab.active { color: var(--primary-dark); font-weight: 600; }
     .tab.active::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 40px; height: 3px; background: var(--primary); border-radius: 2px; }
+    .tab .btn-icon { width: 18px; height: 18px; flex-shrink: 0; }
     .tab-content { display: none; padding: 20px 16px; }
     .tab-content.active { display: block; }
 
@@ -85,14 +86,6 @@
     .seatmap-container { background: var(--white); border: 1.5px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
     .seatmap-container img { max-width: 100%; height: auto; border-radius: 6px; }
     .seatmap-placeholder { padding: 40px 20px; color: var(--text-muted); font-size: 0.85rem; }
-
-    /* ===== 区域选择网格 ===== */
-    .zone-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
-    .zone-chip { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--white); border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-size: 0.88rem; font-weight: 600; }
-    .zone-chip:hover { border-color: var(--primary); background: var(--primary-light); }
-    .zone-chip.active { border-color: var(--primary); background: var(--primary); color: white; }
-    .zone-count { font-size: 0.68rem; color: var(--text-muted); margin-top: 4px; }
-    .zone-chip.active .zone-count { color: rgba(255,255,255,0.9); }
 
     /* ===== 视角卡片 ===== */
     .view-card { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
@@ -192,22 +185,55 @@
   <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" data-tab="search">
-      <svg class="btn-icon" style="margin-right:4px"><use href="#icon-search"></use></svg>查视角
+      <svg class="btn-icon"><use href="#icon-search"></use></svg>
+      <span>查视角</span>
     </button>
     <button class="tab" data-tab="upload">
-      <svg class="btn-icon" style="margin-right:4px"><use href="#icon-upload"></use></svg>传视角
+      <svg class="btn-icon"><use href="#icon-upload"></use></svg>
+      <span>传视角</span>
     </button>
   </div>
 
   <!-- 查视角 Tab -->
   <div class="tab-content active" id="tab-search">
-    <!-- 场馆选择 -->
+    <!-- 筛选条件 -->
     <div class="card">
-      <div class="card-title"><svg class="card-icon"><use href="#icon-venue"></use></svg>选择场馆</div>
-      <div class="searchable-wrap">
-        <input class="form-input" id="venueInput" placeholder="请选择场馆" autocomplete="off" readonly>
-        <input type="hidden" id="venue">
-        <div class="searchable-dropdown" id="venueDropdown"></div>
+      <div class="card-title"><svg class="card-icon"><use href="#icon-filter"></use></svg>筛选视角</div>
+      
+      <div class="form-group">
+        <label class="form-label">场馆</label>
+        <div class="searchable-wrap">
+          <input class="form-input" id="venueInput" placeholder="请选择场馆" autocomplete="off" readonly>
+          <input type="hidden" id="venue">
+          <div class="searchable-dropdown" id="venueDropdown"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">区域</label>
+        <select class="form-input" id="filterZone">
+          <option value="">全部区域</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">排</label>
+          <input class="form-input" id="filterRow" placeholder="如：10" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">座位号</label>
+          <input class="form-input" id="filterSeat" placeholder="如：4" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <button class="btn btn-primary" style="flex:1" onclick="applyFilter()">
+          <svg class="btn-icon"><use href="#icon-search"></use></svg>查询
+        </button>
+        <button class="btn btn-secondary" style="flex:1" onclick="resetFilter()">
+          <svg class="btn-icon"><use href="#icon-reset"></use></svg>重置
+        </button>
       </div>
     </div>
 
@@ -229,39 +255,6 @@
           <div class="seatmap-title"><svg class="btn-icon"><use href="#icon-seatmap"></use></svg>座位图</div>
           <div class="seatmap-container" id="seatmapContainer"><div class="seatmap-placeholder">座位图暂缺</div></div>
         </div>
-      </div>
-
-      <!-- 筛选条件 -->
-      <div class="card">
-        <div class="card-title"><svg class="card-icon"><use href="#icon-filter"></use></svg>筛选视角</div>
-        
-        <div class="form-group">
-          <label class="form-label">区域</label>
-          <select class="form-input" id="filterZone">
-            <option value="">全部区域</option>
-          </select>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">排</label>
-            <input class="form-input" id="filterRow" placeholder="如：10" autocomplete="off">
-          </div>
-          <div class="form-group">
-            <label class="form-label">座位号</label>
-            <input class="form-input" id="filterSeat" placeholder="如：4" autocomplete="off">
-          </div>
-        </div>
-
-        <button class="btn btn-primary" onclick="applyFilter()">
-          <svg class="btn-icon"><use href="#icon-search"></use></svg>查询
-        </button>
-      </div>
-
-      <!-- 区域选择（保留原有网格） -->
-      <div class="card">
-        <div class="card-title"><svg class="card-icon"><use href="#icon-zone"></use></svg>选择区域</div>
-        <div class="zone-grid" id="zoneGrid"></div>
       </div>
     </div>
 
@@ -359,6 +352,7 @@
   <symbol id="icon-image" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></symbol>
   <symbol id="icon-key" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></symbol>
   <symbol id="icon-filter" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></symbol>
+  <symbol id="icon-reset" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
 </svg>
 
 <script>
@@ -516,18 +510,32 @@ function loadVenueData() {
 }
 
 // ===== 场馆下拉 =====
+var venueDropdownInitialized = false;
+
 function setupVenueDropdown(inputId, dropdownId, hiddenId, onSelect) {
   var input = document.getElementById(inputId);
   var dropdown = document.getElementById(dropdownId);
+
+  if (!venueDropdownInitialized) {
+    venueDropdownInitialized = true;
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.searchable-wrap')) {
+        document.querySelectorAll('.searchable-dropdown').forEach(function(d) {
+          d.classList.remove('show');
+        });
+      }
+    });
+  }
+
+  // 移除旧的事件监听器（避免重复绑定）
+  var newInput = input.cloneNode(true);
+  input.parentNode.replaceChild(newInput, input);
+  input = newInput;
 
   input.addEventListener('click', function(e) {
     e.stopPropagation();
     renderVenueDropdown(dropdown, hiddenId, onSelect);
     dropdown.classList.toggle('show');
-  });
-
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.searchable-wrap')) { dropdown.classList.remove('show'); }
   });
 }
 
@@ -542,7 +550,8 @@ function selectVenue(venueId, dropdownId, hiddenId) {
   if (!venue) return;
   var dropdown = document.getElementById(dropdownId);
   var hidden = document.getElementById(hiddenId);
-  var input = dropdown.previousElementSibling.previousElementSibling;
+  var wrap = dropdown.closest('.searchable-wrap');
+  var input = wrap.querySelector('.form-input');
   input.value = venue.name;
   hidden.value = venue.id;
   dropdown.classList.remove('show');
@@ -571,30 +580,21 @@ function showVenueInfo(venue) {
     document.getElementById('seatmapContainer').innerHTML = '<div class="seatmap-placeholder">座位图暂缺</div>';
   }
 
-  // 渲染区域网格（从视角数据中统计）
+  // 填充区域筛选下拉框（从视角数据中统计区域）
   fetch('/api/records', { headers: getHeaders() })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var records = data.records || [];
-      var zoneMap = {};
+      var zoneSet = {};
       records.forEach(function(rec) {
         var f = rec.fields || {};
         var section = f['区域'] || '';
         var m = section.match(/(\d+)/);
         var zoneKey = m ? m[1] : section;
-        if (!zoneMap[zoneKey]) zoneMap[zoneKey] = { count: 0, hasImg: false };
-        zoneMap[zoneKey].count++;
-        var imgs = f['图片'] || [];
-        if (imgs.length > 0) zoneMap[zoneKey].hasImg = true;
+        if (zoneKey) zoneSet[zoneKey] = true;
       });
-      var sortedZones = Object.keys(zoneMap).sort(function(a, b) { return parseInt(a) - parseInt(b); });
-      var grid = document.getElementById('zoneGrid');
-      grid.innerHTML = sortedZones.map(function(z) {
-        var zd = zoneMap[z];
-        return '<div class="zone-chip" onclick="selectZone(\'' + z + '\')" style="' + (zd.hasImg ? 'border-color:var(--primary)' : '') + '"><div>' + z + '区</div><div class="zone-count">' + zd.count + '条</div></div>';
-      }).join('');
+      var sortedZones = Object.keys(zoneSet).sort(function(a, b) { return parseInt(a) - parseInt(b); });
 
-      // 填充区域筛选下拉框
       var filterZone = document.getElementById('filterZone');
       if (filterZone) {
         filterZone.innerHTML = '<option value="">全部区域</option>' + sortedZones.map(function(z) {
@@ -604,49 +604,6 @@ function showVenueInfo(venue) {
 
       document.getElementById('venueInfoSection').style.display = 'block';
       document.getElementById('viewResultSection').style.display = 'none';
-    });
-}
-
-// ===== 选择区域 =====
-function selectZone(zone) {
-  currentZone = zone;
-  document.querySelectorAll('.zone-chip').forEach(function(c) { c.classList.remove('active'); });
-  if (event && event.target) {
-    var chip = event.target.closest('.zone-chip');
-    if (chip) chip.classList.add('active');
-  }
-  showViewResult(zone);
-}
-
-// ===== 显示视角结果 =====
-function showViewResult(zone) {
-  var section = document.getElementById('viewResultSection');
-  section.style.display = 'block';
-  var viewImage = document.getElementById('viewImage');
-  viewImage.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-
-  fetch('/api/records', { headers: getHeaders() })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var records = data.records || [];
-      var matches = records.filter(function(rec) {
-        var f = rec.fields || {};
-        var s = f['区域'] || '';
-        var m = s.match(/(\d+)/);
-        return m && m[1] === zone;
-      });
-
-      if (matches.length > 0) {
-        carouselMatches = matches;
-        carouselIndex = 0;
-        renderCarousel();
-      } else {
-        viewImage.innerHTML = '<div class="view-image-placeholder">该区域暂无视角图</div>';
-        document.getElementById('viewTags').innerHTML = '<span class="tag">' + escapeHtml(currentVenue ? currentVenue.name : '') + '</span><span class="tag">' + zone + '区</span>';
-        document.getElementById('viewDesc').textContent = '该区域暂无视角图';
-        document.getElementById('viewMeta').textContent = '';
-      }
-      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 }
 
@@ -862,6 +819,22 @@ function applyFilter() {
       }
       section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+}
+
+// ===== 重置筛选 =====
+function resetFilter() {
+  document.getElementById('venueInput').value = '';
+  document.getElementById('venue').value = '';
+  document.getElementById('filterZone').value = '';
+  document.getElementById('filterRow').value = '';
+  document.getElementById('filterSeat').value = '';
+  currentVenue = null;
+  currentZone = null;
+  carouselMatches = [];
+  carouselIndex = 0;
+  
+  document.getElementById('venueInfoSection').style.display = 'none';
+  document.getElementById('viewResultSection').style.display = 'none';
 }
 
 // ===== 初始化 =====
