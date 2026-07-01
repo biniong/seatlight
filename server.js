@@ -442,7 +442,7 @@ const server = http.createServer(async (req, res) => {
       // ===== Venues 记录创建（写入 Venues 表） =====
       if (pathname === '/api/venues/create' && req.method === 'POST') {
         if (!json) throw new Error('No body');
-        const VENUES_TABLE = 'tblKw40knld48WpO';
+        const VENUES_TABLE = 'tblKw40knId48WpO';
         const recordData = await feishuRequest('POST',
           `/bitable/v1/apps/${CONFIG.baseId}/tables/${VENUES_TABLE}/records`,
           { fields: {
@@ -475,15 +475,15 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      // ===== Venues 列表（从 Venues 表读取，使用 user token） =====
+      // ===== Venues 列表（从 Venues 表读取，使用 app token） =====
       if (pathname === '/api/venues/list' && req.method === 'GET') {
-        const VENUES_TABLE = 'tblKw40knld48WpO';
+        const VENUES_TABLE = 'tblKw40knId48WpO';
         const all = [];
         let pageToken = null;
         do {
           let p = '/bitable/v1/apps/' + CONFIG.baseId + '/tables/' + VENUES_TABLE + '/records?page_size=100';
           if (pageToken) p += '&page_token=' + pageToken;
-          const data = await feishuRequest('GET', p, null, false);
+          const data = await feishuRequest('GET', p, null, true);
           all.push(...(data.data?.items || []));
           if (!data.data?.has_more) break;
           pageToken = data.data?.page_token || null;
