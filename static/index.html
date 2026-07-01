@@ -504,29 +504,51 @@ function renderBanner() {
   }
 }
 
-// 触摸滑动处理
+// 触摸/鼠标滑动处理
 function setupTouchSwipe(element) {
   var startX = 0;
   var startY = 0;
+  var isTouching = false;
 
+  // 触摸事件
   element.addEventListener('touchstart', function(e) {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
+    isTouching = true;
   }, { passive: true });
 
   element.addEventListener('touchend', function(e) {
-    var endX = e.changedTouches[0].clientX;
-    var endY = e.changedTouches[0].clientY;
+    if (!isTouching) return;
+    isTouching = false;
+    handleSwipe(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+  }, { passive: true });
+
+  // 鼠标拖拽事件（桌面端）
+  element.addEventListener('mousedown', function(e) {
+    startX = e.clientX;
+    startY = e.clientY;
+    isTouching = true;
+  });
+
+  element.addEventListener('mouseup', function(e) {
+    if (!isTouching) return;
+    isTouching = false;
+    handleSwipe(e.clientX, e.clientY);
+  });
+
+  element.addEventListener('mouseleave', function() {
+    isTouching = false;
+  });
+
+  function handleSwipe(endX, endY) {
     var diffX = endX - startX;
     var diffY = endY - startY;
 
-    // 只有水平滑动距离大于垂直距离且大于 50px 时才切换
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+    // 只有水平滑动距离大于垂直距离且大于 30px 时才切换
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 30) {
       if (diffX < 0) {
-        // 向左滑动，下一张
         goToSlide((currentSlideIndex + 1) % bannerSlides.length);
       } else {
-        // 向右滑动，上一张
         goToSlide((currentSlideIndex - 1 + bannerSlides.length) % bannerSlides.length);
       }
       // 重置定时器
@@ -535,7 +557,7 @@ function setupTouchSwipe(element) {
         bannerInterval = setInterval(function() { goToSlide((currentSlideIndex + 1) % bannerSlides.length); }, 4000);
       }
     }
-  }, { passive: true });
+  }
 }
 
 function goToSlide(index) {
