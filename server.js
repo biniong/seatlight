@@ -36,11 +36,28 @@ function loadTokens() {
     if (fs.existsSync(TOKEN_STORE)) {
       const data = JSON.parse(fs.readFileSync(TOKEN_STORE, 'utf-8'));
       tokenState = { ...tokenState, ...data };
-      console.log('[Token] 已加载, 用户:', tokenState.userName || '未知');
+      console.log('[Token] 已加载 (从文件), 用户:', tokenState.userName || '未知');
       console.log('[Token] access_token 有效至:', new Date(tokenState.expiresAt).toISOString());
       console.log('[Token] refresh_token 有效至:', new Date(tokenState.refreshExpiresAt).toISOString());
     } else {
-      console.log('[Token] 无已保存的 token，需要通过 OAuth 登录');
+      console.log('[Token] 无 token 文件');
+    }
+    // 从环境变量读取（Railway Variables，跨部署持久化）
+    const envRefreshToken = process.env.FEISHU_REFRESH_TOKEN;
+    const envUserToken = process.env.FEISHU_USER_TOKEN;
+    if (envRefreshToken && !tokenState.refreshToken) {
+      tokenState.refreshToken = envRefreshToken;
+      tokenState.refreshExpiresAt = Date.now() + 30 * 24 * 3600 * 1000; // 30 天
+      console.log('[Token] ✅ 从环境变量加载 refresh_token');
+    }
+    if (envUserToken && !tokenState.userToken) {
+      tokenState.userToken = envUserToken;
+      tokenState.expiresAt = Date.now() + 2 * 3600 * 1000; // 2 小时
+      tokenState.userName = process.env.FEISHU_USER_NAME || 'Unknown';
+      console.log('[Token] ✅ 从环境变量加载 user_token');
+    }
+    if (!tokenState.userToken && !tokenState.refreshToken) {
+      console.log('[Token] 需要通过 OAuth 登录');
     }
   } catch (e) {
     console.error('[Token] 加载失败:', e.message);
@@ -699,11 +716,16 @@ server.listen(CONFIG.port, () => {
 // ===== 自动审核同步（每 5 分钟检查一次） =====
 async function autoSyncPendingRecords() {
   try {
-    const token = getUserToken();
-    if (!token) {
-      console.log('[AutoSync] 无用户 token，跳过同步');
-      return;
+    // 确保 token 有效（过期则尝试自动续期）
+    if (!tokenState.userToken || Date.now() >= tokenState.expiresAt - 120000) {
+      console.log('[AutoSync] token 即将过期，尝试续期...');
+      const ok = await refreshTokenIfNeeded();
+      if (!ok) {
+        console.log('[AutoSync] 无有效 token 且续期失败，跳过同步');
+        return;
+      }
     }
+
     const pendingRecords = [];
     let pageToken = null;
     do {
@@ -714,8 +736,13 @@ async function autoSyncPendingRecords() {
       if (!data.data?.has_more) break;
       pageToken = data.data?.page_token || null;
     } while (true);
+
     const approvedRecords = pendingRecords.filter(r => r.fields['审核状态'] === '已通过');
-    if (approvedRecords.length === 0) return;
+    if (approvedRecords.length === 0) {
+      console.log('[AutoSync] 暂无已通过的记录');
+      return;
+    }
+
     let syncedCount = 0;
     for (const record of approvedRecords) {
       try {
@@ -735,10 +762,10 @@ async function autoSyncPendingRecords() {
     }
     console.log(`[AutoSync] 🔄 本次同步 ${syncedCount} 条已通过记录`);
   } catch (e) {
-    console.log('[AutoSync] 跳过:', e.message);
+    console.log('[AutoSync] 异常:', e.message);
   }
 }
 
-setTimeout(() => { console.log('[AutoSync] 首次同步...'); autoSyncPendingRecords(); }, 60000);
+setTimeout(() => { console.log('[AutoSync] 首次同步...'); autoSyncPendingRecords(); }, 5000);
 setInterval(autoSyncPendingRecords, 5 * 60 * 1000);
 console.log('[AutoSync] 每 5 分钟自动同步已通过审核的记录');
