@@ -346,7 +346,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/create-pending-table' && req.method === 'POST') {
     try {
       const token = getUserToken();
-      const res = await fetch('https://open.feishu.cn/open-apis/bitable/v1/apps/' + CONFIG.baseId + '/tables', {
+      const fetchRes = await fetch('https://open.feishu.cn/open-apis/bitable/v1/apps/' + CONFIG.baseId + '/tables', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -372,7 +372,7 @@ const server = http.createServer(async (req, res) => {
           }
         })
       });
-      const data = await res.json();
+      const data = await fetchRes.json();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
     } catch (e) {
