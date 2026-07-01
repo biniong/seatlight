@@ -551,22 +551,26 @@ const server = http.createServer(async (req, res) => {
           const ok = await refreshTokenIfNeeded();
           if (!ok) throw new Error('TOKEN_EXPIRED');
         }
+        console.log('[Sync] 使用 user token 同步');
         // 查询所有待审核记录
         const pendingRecords = [];
         let pageToken = null;
         do {
           let p = `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records?page_size=100`;
           if (pageToken) p += '&page_token=' + pageToken;
+          console.log('[Sync] 查询 URL:', p);
           const data = await feishuRequest('GET', p, null, false);
+          console.log('[Sync] 查询结果:', JSON.stringify(data.data?.items?.length || 0), '条');
           pendingRecords.push(...(data.data?.items || []));
           if (!data.data?.has_more) break;
           pageToken = data.data?.page_token || null;
         } while (true);
         console.log('[Sync] 待审核表共', pendingRecords.length, '条记录');
         // 筛选已通过审核的记录
-        const approvedRecords = pendingRecords.filter(r => 
-          r.fields['审核状态'] === '已通过'
-        );
+        const approvedRecords = pendingRecords.filter(r => {
+          console.log('[Sync] 记录', r.record_id, '审核状态:', r.fields['审核状态']);
+          return r.fields['审核状态'] === '已通过';
+        });
         console.log('[Sync] 其中已通过', approvedRecords.length, '条');
 
         let syncedCount = 0;
@@ -577,6 +581,7 @@ const server = http.createServer(async (req, res) => {
             delete fields['审核状态'];
             delete fields['审核时间'];
             delete fields['审核备注'];
+            console.log('[Sync] 同步记录:', record.record_id, '字段:', JSON.stringify(fields));
             await createRecord(fields);
 
             // 同步成功后，删除待审核表中的记录
