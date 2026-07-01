@@ -475,57 +475,21 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      // ===== Venues 列表（从视角记录中提取去重场馆） =====
+      // ===== Venues 列表（从 Venues 表读取，使用 user token） =====
       if (pathname === '/api/venues/list' && req.method === 'GET') {
+        const VENUES_TABLE = 'tblKw40knld48WpO';
         const all = [];
         let pageToken = null;
         do {
-          let p = '/bitable/v1/apps/' + CONFIG.baseId + '/tables/' + CONFIG.tableId + '/records?page_size=100';
+          let p = '/bitable/v1/apps/' + CONFIG.baseId + '/tables/' + VENUES_TABLE + '/records?page_size=100';
           if (pageToken) p += '&page_token=' + pageToken;
-          const data = await feishuRequest('GET', p, null, true);
+          const data = await feishuRequest('GET', p, null, false);
           all.push(...(data.data?.items || []));
           if (!data.data?.has_more) break;
           pageToken = data.data?.page_token || null;
         } while (true);
-
-        // 从记录中提取去重场馆
-        const venueMap = {};
-        all.forEach(function(rec) {
-          var f = rec.fields || {};
-          var name = (f['场馆'] || '').trim();
-          if (!name || venueMap[name]) return;
-          venueMap[name] = {
-            record_id: rec.record_id,
-            fields: { '场馆': name, '所在城市': f['所在城市'] || '', '容量': f['容量'] || '', '类型': f['类型'] || '', '到达方式': f['到达方式'] || '' }
-          };
-        });
-
-        // 补充已知场馆信息（如果记录里没有完整信息）
-        var knownVenues = [
-          { name: 'KSPO DOME 奥林匹克体操竞技场', city: '首尔', capacity: '约15,000', type: '室内竞技场', arrival: '地铁5号线 奥林匹克公园站' },
-          { name: '高阳综合运动场', city: '高阳', capacity: '约40,000', type: '综合体育场', arrival: '地铁3号线 大化站' },
-          { name: 'INSPIRE Arena', city: '仁川', capacity: '约20,000', type: '室内竞技场', arrival: '仁川机场铁路 永宗站' },
-        ];
-        knownVenues.forEach(function(v) {
-          if (!venueMap[v.name]) {
-            venueMap[v.name] = { record_id: '', fields: { '场馆': v.name, '所在城市': v.city, '容量': v.capacity, '类型': v.type, '到达方式': v.arrival } };
-          } else {
-            // 补充缺失字段
-            var existing = venueMap[v.name].fields;
-            if (!existing['所在城市'] || !existing['所在城市'].trim()) existing['所在城市'] = v.city;
-            if (!existing['容量'] || !existing['容量'].trim()) existing['容量'] = v.capacity;
-            if (!existing['类型'] || !existing['类型'].trim()) existing['类型'] = v.type;
-            if (!existing['到达方式'] || !existing['到达方式'].trim()) existing['到达方式'] = v.arrival;
-          }
-        });
-
-        var venues = Object.keys(venueMap).map(function(name) {
-          var v = venueMap[name];
-          return { record_id: v.record_id, fields: v.fields };
-        });
-
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ records: venues }));
+        res.end(JSON.stringify({ records: all }));
         return;
       }
 
