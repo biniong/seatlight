@@ -584,7 +584,7 @@ const server = http.createServer(async (req, res) => {
             '所在城市': json.city,
             '容量': json.capacity,
             '类型': json.type,
-            '到达方式': json.arrival,
+            '交通': json.arrival,
           }});
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, record: recordData.data?.record }));
@@ -735,7 +735,7 @@ const server = http.createServer(async (req, res) => {
               { field_name: '容量', type: 1 },
               { field_name: '类型', type: 1 },
               { field_name: '座位图', type: 17 },
-              { field_name: '到达方式', type: 1 },
+              { field_name: '交通', type: 1 },
             ]
           }
         });
@@ -775,7 +775,7 @@ const server = http.createServer(async (req, res) => {
                 '所在城市': item.city,
                 '容量': item.capacity,
                 '类型': item.type,
-                '到达方式': item.arrival,
+                '交通': item.arrival,
               }});
             venueResults.push({ name: item.name, ok: true });
           } catch (e) {

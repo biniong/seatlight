@@ -489,7 +489,7 @@ function loadVenueData() {
           city: f['所在城市'] || '',
           capacity: f['容量'] || '',
           type: f['类型'] || '',
-          arrival: f['到达方式'] || '',
+          arrival: f['交通'] || '',
           seatmap: seatmapToken ? '/img/' + seatmapToken : ''
         };
       });
