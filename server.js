@@ -422,6 +422,41 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      // ===== Banner 记录创建（写入 Banner 表） =====
+      if (pathname === '/api/banner/create' && req.method === 'POST') {
+        if (!json) throw new Error('No body');
+        const BANNER_TABLE = 'tblOJkxHGDx9Swqk';
+        const recordData = await feishuRequest('POST',
+          `/bitable/v1/apps/${CONFIG.baseId}/tables/${BANNER_TABLE}/records`,
+          { fields: {
+            '演出名称': json.name,
+            '演出时间': json.time,
+            '演出地点': json.location,
+            '图片': json.file_token ? [{ file_token: json.file_token }] : [],
+          }});
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, record: recordData.data?.record }));
+        return;
+      }
+
+      // ===== Venues 记录创建（写入 Venues 表） =====
+      if (pathname === '/api/venues/create' && req.method === 'POST') {
+        if (!json) throw new Error('No body');
+        const VENUES_TABLE = 'tblKw40knld48WpO';
+        const recordData = await feishuRequest('POST',
+          `/bitable/v1/apps/${CONFIG.baseId}/tables/${VENUES_TABLE}/records`,
+          { fields: {
+            '场馆': json.name,
+            '所在城市': json.city,
+            '容量': json.capacity,
+            '类型': json.type,
+            '到达方式': json.arrival,
+          }});
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, record: recordData.data?.record }));
+        return;
+      }
+
       if (pathname === '/api/upload' && req.method === 'POST') {
         if (!json || !json.image) throw new Error('No image data');
         const result = await uploadImage(json.image, json.fileName);
