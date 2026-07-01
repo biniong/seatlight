@@ -206,7 +206,7 @@ async function createPendingRecord(fields) {
   fields['上传时间'] = Date.now();
   const data = await feishuRequest('POST',
     `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.pendingTableId}/records`,
-    { fields }, true); // 使用 app token
+    { fields });
   console.log('[CreatePendingRecord] response:', JSON.stringify(data));
   return data.data?.record;
 }
