@@ -496,9 +496,46 @@ function renderBanner() {
 
   carousel.innerHTML = slidesHtml + '<div class="banner-dots" id="bannerDots">' + dotsHtml + '</div>';
 
+  // 添加触摸滑动支持
+  setupTouchSwipe(carousel);
+
   if (bannerSlides.length > 1) {
     bannerInterval = setInterval(function() { goToSlide((currentSlideIndex + 1) % bannerSlides.length); }, 4000);
   }
+}
+
+// 触摸滑动处理
+function setupTouchSwipe(element) {
+  var startX = 0;
+  var startY = 0;
+
+  element.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  element.addEventListener('touchend', function(e) {
+    var endX = e.changedTouches[0].clientX;
+    var endY = e.changedTouches[0].clientY;
+    var diffX = endX - startX;
+    var diffY = endY - startY;
+
+    // 只有水平滑动距离大于垂直距离且大于 50px 时才切换
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      if (diffX < 0) {
+        // 向左滑动，下一张
+        goToSlide((currentSlideIndex + 1) % bannerSlides.length);
+      } else {
+        // 向右滑动，上一张
+        goToSlide((currentSlideIndex - 1 + bannerSlides.length) % bannerSlides.length);
+      }
+      // 重置定时器
+      if (bannerInterval) {
+        clearInterval(bannerInterval);
+        bannerInterval = setInterval(function() { goToSlide((currentSlideIndex + 1) % bannerSlides.length); }, 4000);
+      }
+    }
+  }, { passive: true });
 }
 
 function goToSlide(index) {
