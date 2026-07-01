@@ -828,7 +828,7 @@ function removeFile(event, idx) {
 
 // ===== 上传 =====
 async function doUpload() {
-  var venue = document.getElementById('upVenue').value;
+  var venue = document.getElementById('upVenueInput').value; // 显示 input 存的是场馆名
   var area = document.getElementById('upArea').value.trim();
   var row = document.getElementById('upRow').value.trim();
   var seat = document.getElementById('upSeat').value.trim();
