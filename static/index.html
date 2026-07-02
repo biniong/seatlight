@@ -958,18 +958,22 @@ async function doUpload() {
   }, 300);
 
   try {
-    // 1. 逐张上传图片，收集所有 file_token
+    // 1. 多图并行上传，收集所有 file_token
     var fileTokens = [];
+    text.textContent = '上传 ' + selectedFiles.length + ' 张图片中...';
+    var uploadPromises = [];
     for (var i = 0; i < selectedFiles.length; i++) {
-      var item = selectedFiles[i];
-      text.textContent = '上传图片 ' + (i + 1) + '/' + selectedFiles.length + '...';
-
-      var uploadRes = await fetch('/api/upload', {
-        method: 'POST', headers: getHeaders(), body: JSON.stringify({ image: item.dataUrl, fileName: item.file.name || 'upload.jpg' })
-      });
-      var uploadData = await uploadRes.json();
-      if (uploadData.error) throw new Error('上传失败: ' + uploadData.error);
-      if (uploadData.fileToken) fileTokens.push({ file_token: uploadData.fileToken });
+      var uploadItem = selectedFiles[i];
+      uploadPromises.push(
+        fetch('/api/upload', {
+          method: 'POST', headers: getHeaders(), body: JSON.stringify({ image: uploadItem.dataUrl, fileName: uploadItem.file.name || 'upload.jpg' })
+        }).then(function(r) { return r.json(); })
+      );
+    }
+    var results = await Promise.all(uploadPromises);
+    for (var j = 0; j < results.length; j++) {
+      if (results[j].error) throw new Error('上传失败: ' + results[j].error);
+      if (results[j].fileToken) fileTokens.push({ file_token: results[j].fileToken });
     }
 
     fill.style.width = '70%';

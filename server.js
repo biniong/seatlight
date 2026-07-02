@@ -339,8 +339,20 @@ async function proxyFeishuImage(fileToken, res) {
     const token = await getAppAccessToken();
     const imgRes = await fetch(`https://open.feishu.cn/open-apis/drive/v1/medias/${fileToken}/download`, {
       headers: { 'Authorization': 'Bearer ' + token },
-      redirect: 'follow',
+      redirect: 'manual', // 手动处理，拿到飞书 CDN 真实地址
     });
+    
+    // 飞书返回 302 → 直接让浏览器跳转 CDN，省去服务端转发
+    const location = imgRes.headers.get('location');
+    if (location) {
+      res.writeHead(302, {
+        'Location': location,
+        'Cache-Control': 'public, max-age=86400, immutable',
+      });
+      res.end();
+      return;
+    }
+    
     if (!imgRes.ok) {
       res.writeHead(imgRes.status);
       res.end('Image fetch failed');
@@ -349,7 +361,7 @@ async function proxyFeishuImage(fileToken, res) {
     const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
     res.writeHead(200, {
       'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'public, max-age=86400, immutable',
     });
     const reader = imgRes.body.getReader();
     while (true) {
