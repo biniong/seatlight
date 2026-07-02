@@ -255,11 +255,17 @@ async function feishuRequest(method, urlPath, body, useAppToken, _retried) {
   return data;
 }
 
-async function getAllRecords() {
+async function getAllRecords(venue) {
   const all = [];
   let pageToken = null;
+  // 如果指定了场馆，用飞书 API 的 filter 预过滤
+  let filter = null;
+  if (venue) {
+    filter = `CurrentValue.[场馆]="${venue}"`;
+  }
   do {
     let p = `/bitable/v1/apps/${CONFIG.baseId}/tables/${CONFIG.tableId}/records?page_size=100`;
+    if (filter) p += '&filter=' + encodeURIComponent(filter);
     if (pageToken) p += '&page_token=' + pageToken;
     const data = await feishuRequest('GET', p, null, true);
     all.push(...(data.data?.items || []));
@@ -632,7 +638,9 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (pathname === '/api/records' && req.method === 'GET') {
-        const records = await getAllRecords();
+        // 按场馆过滤，减少传输数据
+        const venue = urlObj.searchParams.get('venue');
+        const records = await getAllRecords(venue);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ records }));
         return;

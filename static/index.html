@@ -1051,7 +1051,12 @@ function applyFilter() {
   var viewImage = document.getElementById('viewImage');
   viewImage.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
-  fetch('/api/records', { headers: getHeaders() })
+  // 按场馆查询，减少传输数据
+  var searchUrl = '/api/records';
+  if (currentVenue && currentVenue.name) {
+    searchUrl += '?venue=' + encodeURIComponent(currentVenue.name);
+  }
+  fetch(searchUrl, { headers: getHeaders() })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var records = data.records || [];
