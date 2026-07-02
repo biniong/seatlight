@@ -132,6 +132,15 @@ async function refreshTokenIfNeeded() {
     tokenState.refreshToken = data.data.refresh_token;
     tokenState.expiresAt = Date.now() + data.data.expires_in * 1000;
     tokenState.refreshExpiresAt = Date.now() + data.data.refresh_expires_in * 1000;
+    
+    // 同步更新环境变量（确保服务重启后也能加载最新 token）
+    if (process.env.FEISHU_USER_TOKEN) {
+      process.env.FEISHU_USER_TOKEN = data.data.access_token;
+    }
+    if (process.env.FEISHU_REFRESH_TOKEN) {
+      process.env.FEISHU_REFRESH_TOKEN = data.data.refresh_token;
+    }
+    
     saveTokens();
     console.log('[Token] ✅ 续期成功！access_token 有效至', new Date(tokenState.expiresAt).toISOString());
     return true;
@@ -165,6 +174,10 @@ async function exchangeCodeForTokens(code, redirectUri) {
   tokenState.refreshToken = data.data.refresh_token;
   tokenState.expiresAt = Date.now() + data.data.expires_in * 1000;
   tokenState.refreshExpiresAt = Date.now() + data.data.refresh_expires_in * 1000;
+
+  // 同步更新环境变量（确保服务重启后也能加载最新 token）
+  process.env.FEISHU_USER_TOKEN = data.data.access_token;
+  process.env.FEISHU_REFRESH_TOKEN = data.data.refresh_token;
 
   // 获取用户信息
   try {
