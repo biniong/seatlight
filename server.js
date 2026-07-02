@@ -103,17 +103,17 @@ async function getValidToken() {
   return tokenState.userToken;
 }
 
-// 用 refresh_token 续期 access_token
-async function refreshTokenIfNeeded() {
+// 用 refresh_token 续期 access_token（force=true 时跳过过期检查，强制刷新）
+async function refreshTokenIfNeeded(force) {
   if (!tokenState.refreshToken) {
     console.warn('[Token] 无 refresh_token，无法自动续期');
     return false;
   }
-  if (Date.now() < tokenState.expiresAt - 120000) {
+  if (!force && Date.now() < tokenState.expiresAt - 120000) {
     return true; // 还有 2 分钟以上才过期
   }
 
-  console.log('[Token] 🔁 正在使用 refresh_token 续期...');
+  console.log('[Token] 🔁 正在使用 refresh_token 续期...', force ? '(强制刷新)' : '(即将过期)');
   try {
     const res = await fetch('https://open.feishu.cn/open-apis/authen/v1/oidc/refresh_access_token', {
       method: 'POST',
@@ -845,7 +845,8 @@ const server = http.createServer(async (req, res) => {
 
 // ===== 启动 =====
 loadTokens();
-setTimeout(() => refreshTokenIfNeeded(), 3000);
+// 启动时强制刷新一次 token（无论是否过期），确保拿到最新的 access_token
+setTimeout(() => refreshTokenIfNeeded(true), 3000);
 setInterval(() => refreshTokenIfNeeded(), 90 * 60 * 1000); // 每 90 分钟检查
 
 server.listen(CONFIG.port, () => {
