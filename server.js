@@ -198,7 +198,7 @@ async function getAppAccessToken() {
 }
 
 // ===== 飞书 API =====
-async function feishuRequest(method, urlPath, body, useAppToken) {
+async function feishuRequest(method, urlPath, body, useAppToken, _retried) {
   const token = useAppToken ? await getAppAccessToken() : await getValidToken();
   const opts = {
     method,
@@ -212,7 +212,17 @@ async function feishuRequest(method, urlPath, body, useAppToken) {
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); } catch { throw new Error('Non-JSON: ' + text.substring(0, 200)); }
-  if (data.code !== 0) throw new Error('API [' + data.code + ']: ' + data.msg);
+  if (data.code !== 0) {
+    // token 失效错误（常见 code: 99991663 / 99991668 / 99991661）→ 强制刷新 token 后重试一次
+    if (!useAppToken && !_retried && [99991663, 99991668, 99991661, 99991664].includes(data.code)) {
+      console.log('[API] ⚠️ token 失效，强制刷新后重试...');
+      tokenState.userToken = null; // 强制标记失效
+      const ok = await refreshTokenIfNeeded();
+      if (!ok) throw new Error('TOKEN_EXPIRED_AND_REFRESH_FAILED');
+      return feishuRequest(method, urlPath, body, useAppToken, true); // 重试一次
+    }
+    throw new Error('API [' + data.code + ']: ' + data.msg);
+  }
   return data;
 }
 
@@ -251,7 +261,7 @@ async function createPendingRecord(fields) {
   return data.data?.record;
 }
 
-async function uploadImage(base64Data, fileName) {
+async function uploadImage(base64Data, fileName, _retried) {
   const token = await getValidToken();
   const matches = base64Data.match(/^data:(image\/\w+);base64,(.+)$/);
   if (!matches) throw new Error('Invalid base64');
@@ -280,7 +290,17 @@ async function uploadImage(base64Data, fileName) {
     body: fullBody,
   });
   const data = await res.json();
-  if (data.code !== 0) throw new Error('上传失败: ' + data.msg + ' (raw: ' + JSON.stringify(data) + ')');
+  if (data.code !== 0) {
+    // token 失效错误（99991663 或 99991668）→ 强制刷新后重试一次
+    if (!_retried && [99991663, 99991668].includes(data.code)) {
+      console.log('[Upload] ⚠️ token 失效，强制刷新后重试...');
+      tokenState.userToken = null;
+      const ok = await refreshTokenIfNeeded();
+      if (!ok) throw new Error('TOKEN_EXPIRED_AND_REFRESH_FAILED');
+      return uploadImage(base64Data, fileName, true);
+    }
+    throw new Error('上传失败: ' + data.msg + ' (raw: ' + JSON.stringify(data) + ')');
+  }
   return data.data;
 }
 
