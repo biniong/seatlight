@@ -833,11 +833,20 @@ function imageToJpeg(file) {
       var img = new Image();
       img.onload = function() {
         var canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
+        // 限制最大尺寸为 1920px，超大图片才压缩
+        var maxW = 1920, maxH = 1920;
+        var w = img.naturalWidth, h = img.naturalHeight;
+        if (w > maxW || h > maxH) {
+          var ratio = Math.min(maxW / w, maxH / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        canvas.width = w;
+        canvas.height = h;
         var ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        var jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        ctx.drawImage(img, 0, 0, w, h);
+        // 质量 0.85，适中平衡大小和画质
+        var jpegDataUrl = canvas.toDataURL('image/jpeg', 0.85);
         var base64 = jpegDataUrl.split(',')[1];
         resolve({
           dataUrl: jpegDataUrl,
