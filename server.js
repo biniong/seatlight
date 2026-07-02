@@ -436,6 +436,21 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ===== 临时 API：导出 token（用于设置 Railway Variables） =====
+  if (pathname === '/api/debug/refresh' && req.method === 'POST') {
+    const inviteCode = req.headers['x-invite-code'];
+    if (inviteCode !== CONFIG.inviteCode) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '无效的邀请码' }));
+      return;
+    }
+    const before = { userToken: tokenState.userToken ? tokenState.userToken.substring(0, 10) + '...' : null, refreshToken: tokenState.refreshToken ? tokenState.refreshToken.substring(0, 10) + '...' : null, expiresAt: tokenState.expiresAt };
+    const ok = await refreshTokenIfNeeded(true);
+    const after = { userToken: tokenState.userToken ? tokenState.userToken.substring(0, 10) + '...' : null, refreshToken: tokenState.refreshToken ? tokenState.refreshToken.substring(0, 10) + '...' : null, expiresAt: tokenState.expiresAt };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok, before, after }));
+    return;
+  }
+
   if (pathname === '/api/debug/export-tokens' && req.method === 'GET') {
     const inviteCode = req.headers['x-invite-code'];
     if (inviteCode !== CONFIG.inviteCode) {
@@ -586,7 +601,8 @@ const server = http.createServer(async (req, res) => {
         const forceValid = !!(tokenState.userToken && Date.now() < tokenState.expiresAt - 60000);
         if (!forceValid && tokenState.refreshToken) {
           console.log('[Health] token 过期，触发刷新...');
-          await refreshTokenIfNeeded(true);
+          const refreshed = await refreshTokenIfNeeded(true);
+          console.log('[Health] 刷新结果:', refreshed, 'expiresAt:', tokenState.expiresAt);
         }
         const valid = !!(tokenState.userToken && Date.now() < tokenState.expiresAt - 60000);
         res.writeHead(200, { 'Content-Type': 'application/json' });
