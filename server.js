@@ -49,26 +49,31 @@ function loadTokens() {
       }
     }
     
-    // 文件没有时，从环境变量兜底（仅在首次部署或文件丢失时触发）
-    if (!tokenState.userToken || !tokenState.refreshToken) {
+    // 文件没有 userToken 但有 refreshToken 时，从环境变量兜底
+    // 只有 refreshToken 没有 userToken 是正常的（userToken 2小时过期，refreshToken 30天）
+    if (!tokenState.userToken && tokenState.refreshToken) {
+      console.log('[Token] 无 userToken 但有 refreshToken，启动后将自动刷新');
+    }
+    
+    // 完全没有 token 时，从环境变量兜底
+    if (!tokenState.refreshToken) {
       const envRefreshToken = process.env.FEISHU_REFRESH_TOKEN;
       const envUserToken = process.env.FEISHU_USER_TOKEN;
-      if (envRefreshToken && !tokenState.refreshToken) {
+      if (envRefreshToken) {
         tokenState.refreshToken = envRefreshToken;
         tokenState.refreshExpiresAt = Date.now() + 30 * 24 * 3600 * 1000;
         console.log('[Token] 从环境变量兜底加载 refresh_token');
       }
-      if (envUserToken && !tokenState.userToken) {
+      if (envUserToken) {
         tokenState.userToken = envUserToken;
-        tokenState.expiresAt = 0; // 标记为未知有效期，触发强制刷新
+        tokenState.expiresAt = 0;
         tokenState.userName = process.env.FEISHU_USER_NAME || '';
-        console.log('[Token] 从环境变量兜底加载 user_token（有效期未知，将触发刷新）');
-        // 如果同时有 refreshToken，立即写入文件
-        if (tokenState.refreshToken) saveTokens();
+        console.log('[Token] 从环境变量兜底加载 user_token');
+        saveTokens();
       }
     }
     
-    if (!tokenState.userToken && !tokenState.refreshToken) {
+    if (!tokenState.refreshToken) {
       console.log('[Token] 需要通过 OAuth 登录');
     }
   } catch (e) {
