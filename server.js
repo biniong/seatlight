@@ -94,6 +94,13 @@ function getUserToken() {
   throw new Error('TOKEN_EXPIRED');
 }
 
+// 获取有效 token，必要时自动刷新（异步版本，用于需要刷新的场景）
+async function getValidToken() {
+  // 先尝试刷新（如果快过期了）
+  await refreshTokenIfNeeded();
+  return getUserToken();
+}
+
 // 用 refresh_token 续期 access_token
 async function refreshTokenIfNeeded() {
   if (!tokenState.refreshToken) {
@@ -192,7 +199,7 @@ async function getAppAccessToken() {
 
 // ===== 飞书 API =====
 async function feishuRequest(method, urlPath, body, useAppToken) {
-  const token = useAppToken ? await getAppAccessToken() : getUserToken();
+  const token = useAppToken ? await getAppAccessToken() : await getValidToken();
   const opts = {
     method,
     headers: {
@@ -245,7 +252,7 @@ async function createPendingRecord(fields) {
 }
 
 async function uploadImage(base64Data, fileName) {
-  const token = getUserToken();
+  const token = await getValidToken();
   const matches = base64Data.match(/^data:(image\/\w+);base64,(.+)$/);
   if (!matches) throw new Error('Invalid base64');
   const mimeType = matches[1];
