@@ -133,6 +133,15 @@ async function refreshTokenIfNeeded(force) {
     const data = await res.json();
     if (data.code !== 0) {
       console.error('[Token] ❌ 续期失败:', data.code, data.msg);
+      // 如果 refresh_token 本身失效，清除缓存
+      if (data.code === 99991676 || data.code === 99991668) {
+        console.log('[Token] refresh_token 已失效，清除缓存');
+        tokenState.userToken = null;
+        tokenState.refreshToken = null;
+        tokenState.expiresAt = 0;
+        tokenState.refreshExpiresAt = 0;
+        saveTokens();
+      }
       return false;
     }
     tokenState.userToken = data.data.access_token;
