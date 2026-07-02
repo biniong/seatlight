@@ -103,7 +103,11 @@ async function getValidToken() {
   await refreshTokenIfNeeded();
   // 如果还是没有有效 token，强制刷新
   if (!tokenState.userToken) {
-    throw new Error('TOKEN_MISSING');
+    console.log('[Token] 无 userToken，强制刷新...');
+    const forced = await refreshTokenIfNeeded(true);
+    if (!forced || !tokenState.userToken) {
+      throw new Error('TOKEN_MISSING');
+    }
   }
   return tokenState.userToken;
 }
