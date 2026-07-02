@@ -523,16 +523,20 @@ function loadBannerFromApi() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.records && data.records.length > 0) {
-        bannerSlides = data.records.map(function(rec) {
-          var f = rec.fields;
-          var imgToken = (f['图片'] && f['图片'][0]) ? f['图片'][0].file_token : '';
-          return {
-            name: f['演出名称'] || '',
-            time: f['演出时间'] || '',
-            location: f['演出地点'] || '',
-            imgUrl: imgToken ? '/img/' + imgToken : ''
-          };
-        }).filter(function(s) { return s.imgUrl; });
+        bannerSlides = data.records
+          .map(function(rec) {
+            var f = rec.fields;
+            var imgToken = (f['图片'] && f['图片'][0]) ? f['图片'][0].file_token : '';
+            return {
+              name: f['演出名称'] || '',
+              time: f['演出时间'] || '',
+              location: f['演出地点'] || '',
+              order: parseInt(f['顺序']) || 999,
+              imgUrl: imgToken ? '/img/' + imgToken : ''
+            };
+          })
+          .filter(function(s) { return s.imgUrl; })
+          .sort(function(a, b) { return a.order - b.order; });
         if (bannerSlides.length > 0) {
           currentSlideIndex = 0;
           renderBanner();
