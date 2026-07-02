@@ -114,7 +114,7 @@ async function refreshTokenIfNeeded(force) {
     console.warn('[Token] 无 refresh_token，无法自动续期');
     return false;
   }
-  if (!force && Date.now() < tokenState.expiresAt - 120000) {
+  if (!force && tokenState.expiresAt > 0 && Date.now() < tokenState.expiresAt - 120000) {
     return true; // 还有 2 分钟以上才过期
   }
 
