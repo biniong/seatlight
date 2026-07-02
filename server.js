@@ -36,11 +36,11 @@ function loadTokens() {
     // 优先从持久化文件加载（Railway Volume，跨部署保留最新 token）
     if (fs.existsSync(TOKEN_STORE)) {
       const data = JSON.parse(fs.readFileSync(TOKEN_STORE, 'utf-8'));
-      if (data.userToken && data.expiresAt > Date.now()) {
+      if (data.userToken) {
         tokenState.userToken = data.userToken;
-        tokenState.expiresAt = data.expiresAt;
+        tokenState.expiresAt = data.expiresAt || 0;
         tokenState.userName = data.userName || '';
-        console.log('[Token] ✅ 从文件加载 user_token，有效至', new Date(data.expiresAt).toISOString());
+        console.log('[Token] ✅ 从文件加载 user_token');
       }
       if (data.refreshToken) {
         tokenState.refreshToken = data.refreshToken;
@@ -60,11 +60,11 @@ function loadTokens() {
       }
       if (envUserToken && !tokenState.userToken) {
         tokenState.userToken = envUserToken;
-        tokenState.expiresAt = Date.now() + 2 * 3600 * 1000;
+        tokenState.expiresAt = 0; // 标记为未知有效期，触发强制刷新
         tokenState.userName = process.env.FEISHU_USER_NAME || '';
-        console.log('[Token] 从环境变量兜底加载 user_token');
-        // 立即写入文件，避免下次重启又从环境变量加载过期 token
-        saveTokens();
+        console.log('[Token] 从环境变量兜底加载 user_token（有效期未知，将触发刷新）');
+        // 如果同时有 refreshToken，立即写入文件
+        if (tokenState.refreshToken) saveTokens();
       }
     }
     
@@ -86,7 +86,7 @@ function saveTokens() {
 }
 
 function getUserToken() {
-  if (tokenState.userToken && Date.now() < tokenState.expiresAt - 60000) {
+  if (tokenState.userToken) {
     return tokenState.userToken;
   }
   throw new Error('TOKEN_EXPIRED');
@@ -96,7 +96,11 @@ function getUserToken() {
 async function getValidToken() {
   // 先尝试刷新（如果快过期了）
   await refreshTokenIfNeeded();
-  return getUserToken();
+  // 如果还是没有有效 token，强制刷新
+  if (!tokenState.userToken) {
+    throw new Error('TOKEN_MISSING');
+  }
+  return tokenState.userToken;
 }
 
 // 用 refresh_token 续期 access_token
@@ -224,8 +228,8 @@ async function feishuRequest(method, urlPath, body, useAppToken, _retried) {
   let data;
   try { data = JSON.parse(text); } catch { throw new Error('Non-JSON: ' + text.substring(0, 200)); }
   if (data.code !== 0) {
-    // token 失效错误（常见 code: 99991663 / 99991668 / 99991661）→ 强制刷新 token 后重试一次
-    if (!useAppToken && !_retried && [99991663, 99991668, 99991661, 99991664].includes(data.code)) {
+    // token 失效错误（常见 code: 99991663/99991668/99991661/99991664/99991677）→ 强制刷新 token 后重试一次
+    if (!useAppToken && !_retried && [99991663, 99991668, 99991661, 99991664, 99991677].includes(data.code)) {
       console.log('[API] ⚠️ token 失效，强制刷新后重试...');
       tokenState.userToken = null; // 强制标记失效
       const ok = await refreshTokenIfNeeded();
@@ -302,8 +306,8 @@ async function uploadImage(base64Data, fileName, _retried) {
   });
   const data = await res.json();
   if (data.code !== 0) {
-    // token 失效错误（99991663 或 99991668）→ 强制刷新后重试一次
-    if (!_retried && [99991663, 99991668].includes(data.code)) {
+    // token 失效错误（99991663/99991668/99991677）→ 强制刷新后重试一次
+    if (!_retried && [99991663, 99991668, 99991677].includes(data.code)) {
       console.log('[Upload] ⚠️ token 失效，强制刷新后重试...');
       tokenState.userToken = null;
       const ok = await refreshTokenIfNeeded();
