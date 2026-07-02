@@ -228,9 +228,6 @@ async function getAppAccessToken() {
 
 // ===== 飞书 API =====
 async function feishuRequest(method, urlPath, body, useAppToken, _retried) {
-  // 查询类操作（GET）使用 App Token，不需要用户授权
-  // 写入类操作（POST/PUT/DELETE）使用 User Token，需要用户授权
-  const isWrite = method !== 'GET';
   const token = useAppToken ? await getAppAccessToken() : await getValidToken();
   const opts = {
     method,
