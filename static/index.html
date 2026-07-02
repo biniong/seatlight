@@ -51,7 +51,7 @@
     .lightbox-img-wrap {
       position: relative; width: 100%; height: 100%;
       display: flex; align-items: center; justify-content: center;
-      transform-origin: 0 0;
+      transform-origin: center center;
       will-change: transform;
     }
     .lightbox-img-wrap img {
@@ -1134,6 +1134,8 @@ var lbStartX = 0, lbStartY = 0;
 var lbLastX = 0, lbLastY = 0;
 var lbPinchStartDist = 0;
 var lbPinchStartScale = 1;
+var lbPinchStartTx = 0, lbPinchStartTy = 0;
+var lbPinchFocalX = 0, lbPinchFocalY = 0; // 双指中心点相对容器中心
 var lbDoubleTapTimer = null;
 var lbLastTapTime = 0;
 var lbZoomInfoTimer = null;
@@ -1254,6 +1256,17 @@ function handleTouchStart(e) {
     e.preventDefault();
     lbPinchStartDist = getDistance(e.touches[0], e.touches[1]);
     lbPinchStartScale = lbScale;
+    lbPinchStartTx = lbTranslateX;
+    lbPinchStartTy = lbTranslateY;
+    // 记录初始焦点点（双指中心点相对容器中心的偏移）
+    var stage = document.getElementById('lbStage');
+    var rect = stage.getBoundingClientRect();
+    var centerX = rect.left + rect.width / 2;
+    var centerY = rect.top + rect.height / 2;
+    var midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    var midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    lbPinchFocalX = midX - centerX - lbTranslateX;
+    lbPinchFocalY = midY - centerY - lbTranslateY;
   } else if (e.touches.length === 1) {
     // 单指拖拽 或 双击检测
     var now = Date.now();
@@ -1278,10 +1291,14 @@ function handleTouchMove(e) {
   if (e.touches.length === 2) {
     e.preventDefault();
     var dist = getDistance(e.touches[0], e.touches[1]);
-    lbScale = Math.max(1, Math.min(5, lbPinchStartScale * (dist / lbPinchStartDist)));
+    var newScale = Math.max(1, Math.min(5, lbPinchStartScale * (dist / lbPinchStartDist)));
+    // 围绕焦点缩放：保持焦点位置不变
+    var ratio = newScale / lbPinchStartScale;
+    lbTranslateX = lbPinchFocalX * (1 - ratio) + lbPinchStartTx * ratio;
+    lbTranslateY = lbPinchFocalY * (1 - ratio) + lbPinchStartTy * ratio;
+    lbScale = newScale;
     applyTransform();
     showZoomInfo();
-    if (lbScale === 1) { lbTranslateX = 0; lbTranslateY = 0; applyTransform(); }
   } else if (e.touches.length === 1 && lbIsDragging && lbScale > 1) {
     e.preventDefault();
     lbTranslateX = e.touches[0].clientX - lbStartX;
@@ -1312,8 +1329,17 @@ function handleTouchEnd(e) {
 // 鼠标滚轮缩放
 function handleWheel(e) {
   e.preventDefault();
+  var stage = document.getElementById('lbStage');
+  var rect = stage.getBoundingClientRect();
+  var centerX = rect.width / 2;
+  var centerY = rect.height / 2;
+  var focalX = e.clientX - rect.left - centerX - lbTranslateX;
+  var focalY = e.clientY - rect.top - centerY - lbTranslateY;
   var delta = e.deltaY > 0 ? 0.9 : 1.1;
   var newScale = Math.max(1, Math.min(5, lbScale * delta));
+  var ratio = newScale / lbScale;
+  lbTranslateX = focalX * (1 - ratio) + lbTranslateX * ratio;
+  lbTranslateY = focalY * (1 - ratio) + lbTranslateY * ratio;
   lbScale = newScale;
   if (lbScale === 1) { lbTranslateX = 0; lbTranslateY = 0; }
   applyTransform();
