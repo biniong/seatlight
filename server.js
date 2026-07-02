@@ -228,6 +228,9 @@ async function getAppAccessToken() {
 
 // ===== 飞书 API =====
 async function feishuRequest(method, urlPath, body, useAppToken, _retried) {
+  // 查询类操作（GET）使用 App Token，不需要用户授权
+  // 写入类操作（POST/PUT/DELETE）使用 User Token，需要用户授权
+  const isWrite = method !== 'GET';
   const token = useAppToken ? await getAppAccessToken() : await getValidToken();
   const opts = {
     method,
@@ -246,7 +249,7 @@ async function feishuRequest(method, urlPath, body, useAppToken, _retried) {
     if (!useAppToken && !_retried && [99991663, 99991668, 99991661, 99991664, 99991677].includes(data.code)) {
       console.log('[API] ⚠️ token 失效，强制刷新后重试...');
       tokenState.userToken = null; // 强制标记失效
-      const ok = await refreshTokenIfNeeded();
+      const ok = await refreshTokenIfNeeded(true);
       if (!ok) throw new Error('TOKEN_EXPIRED_AND_REFRESH_FAILED');
       return feishuRequest(method, urlPath, body, useAppToken, true); // 重试一次
     }
