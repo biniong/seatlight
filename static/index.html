@@ -19,6 +19,77 @@
     }
     .app-container { max-width: 480px; margin: 0 auto; padding: 0 0 80px; position: relative; }
 
+    /* ===== 图片查看器（lightbox） ===== */
+    .lightbox-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+      z-index: 9999; display: none; touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    .lightbox-overlay.active { display: block; animation: lbFadeIn .2s ease; }
+    @keyframes lbFadeIn { from { opacity: 0 } to { opacity: 1 } }
+    .lightbox-header {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+      z-index: 10; background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent);
+      padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    }
+    .lightbox-caption { color: #fff; font-size: 13px; font-weight: 500; flex: 1; text-align: center; }
+    .lightbox-counter { color: rgba(255,255,255,.8); font-size: 12px; padding: 0 12px; min-width: 40px; }
+    .lightbox-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,.15); border: none; color: #fff;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    }
+    .lightbox-btn svg { width: 20px; height: 20px; fill: #fff; }
+    .lightbox-btn-close svg { width: 18px; height: 18px; }
+    .lightbox-stage {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .lightbox-img-wrap {
+      position: relative; width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+    .lightbox-img-wrap img {
+      max-width: 100%; max-height: 100%;
+      object-fit: contain; pointer-events: none;
+      -webkit-user-drag: none; user-drag: none;
+    }
+    .lightbox-nav {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(255,255,255,.15); backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: none; color: #fff; font-size: 22px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 5; transition: opacity .2s;
+    }
+    .lightbox-nav.prev { left: 12px; }
+    .lightbox-nav.next { right: 12px; }
+    .lightbox-nav:disabled { opacity: .3; cursor: default; }
+    .lightbox-hint {
+      position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+      left: 50%; transform: translateX(-50%);
+      color: rgba(255,255,255,.7); font-size: 12px;
+      background: rgba(0,0,0,.4); padding: 4px 12px; border-radius: 12px;
+      pointer-events: none; transition: opacity .4s;
+    }
+    .lightbox-zoom-info {
+      position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 60px);
+      left: 50%; transform: translateX(-50%);
+      color: #fff; font-size: 12px; background: rgba(0,0,0,.5);
+      padding: 2px 10px; border-radius: 10px;
+      pointer-events: none; opacity: 0; transition: opacity .25s;
+    }
+    .lightbox-zoom-info.show { opacity: 1; }
+
+    /* ===== 座位图/视角图片点击态 ===== */
+    #seatmapContainer img, #viewImage img { cursor: zoom-in; }
+
     /* ===== 顶部品牌区 ===== */
     .top-bar { background: var(--white); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
     .brand { display: flex; align-items: center; gap: 10px; }
@@ -694,7 +765,7 @@ function showVenueInfo(venue) {
   }
 
   if (venue.seatmap) {
-    document.getElementById('seatmapContainer').innerHTML = '<img src="' + venue.seatmap + '" alt="座位图">';
+    document.getElementById('seatmapContainer').innerHTML = '<img src="' + venue.seatmap + '" alt="座位图" onclick="openSeatmapLightbox()">';
   } else {
     document.getElementById('seatmapContainer').innerHTML = '<div class="seatmap-placeholder">座位图暂缺</div>';
   }
@@ -724,7 +795,7 @@ function renderCarousel() {
   var imgUrl = fileToken ? '/img/' + fileToken : '';
 
   if (imgUrl) {
-    var html = '<img src="' + imgUrl + '" alt="视角" onerror="this.parentElement.innerHTML=\'<div class=\\\'view-image-placeholder\\\'>图片加载失败</div>\'">';
+    var html = '<img src="' + imgUrl + '" alt="视角" onclick="openViewImageLightbox()" onerror="this.parentElement.innerHTML=\'<div class=\'view-image-placeholder\'>图片加载失败</div>\'">';
     // 多条记录间的导航
     if (carouselMatches.length > 1) {
       html += '<button onclick="navigateCarousel(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.9);border:1.5px solid var(--border);cursor:pointer;z-index:2">◀</button>';
@@ -1049,6 +1120,248 @@ function resetFilter() {
   document.getElementById('venueInfoSection').style.display = 'none';
   document.getElementById('viewResultSection').style.display = 'none';
 }
+
+// ===== 图片查看器（lightbox） =====
+var lbOverlay = null;
+var lbImages = [];        // 当前图片列表（file_token 数组）
+var lbIndex = 0;          // 当前显示索引
+var lbCaption = '';       // 标题文字
+var lbScale = 1;          // 当前缩放比例
+var lbTranslateX = 0;     // 水平位移
+var lbTranslateY = 0;     // 垂直位移
+var lbIsDragging = false; // 是否正在拖拽
+var lbStartX = 0, lbStartY = 0;
+var lbLastX = 0, lbLastY = 0;
+var lbPinchStartDist = 0;
+var lbPinchStartScale = 1;
+var lbDoubleTapTimer = null;
+var lbLastTapTime = 0;
+var lbZoomInfoTimer = null;
+
+function openLightbox(images, startIndex, caption) {
+  lbImages = images || [];
+  if (lbImages.length === 0) return;
+  lbIndex = startIndex || 0;
+  lbCaption = caption || '';
+  renderLightbox();
+  lbOverlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  lbOverlay.classList.remove('active');
+  document.body.style.overflow = '';
+  lbScale = 1; lbTranslateX = 0; lbTranslateY = 0;
+}
+
+function renderLightbox() {
+  var img = lbImages[lbIndex];
+  var src = img.url || (img.file_token ? '/img/' + img.file_token : '');
+  var stage = lbOverlay.querySelector('.lightbox-img-wrap');
+  stage.innerHTML = '<img src="' + src + '" alt="图片" draggable="false">';
+  // 重置变换
+  lbScale = 1; lbTranslateX = 0; lbTranslateY = 0;
+  applyTransform();
+  // 更新 UI
+  lbOverlay.querySelector('.lightbox-caption').textContent = lbCaption;
+  var counter = lbOverlay.querySelector('.lightbox-counter');
+  if (lbImages.length > 1) {
+    counter.textContent = (lbIndex + 1) + ' / ' + lbImages.length;
+    counter.style.display = '';
+  } else {
+    counter.style.display = 'none';
+  }
+  // 导航按钮
+  var prevBtn = lbOverlay.querySelector('.lightbox-nav.prev');
+  var nextBtn = lbOverlay.querySelector('.lightbox-nav.next');
+  prevBtn.style.display = lbImages.length > 1 ? '' : 'none';
+  nextBtn.style.display = lbImages.length > 1 ? '' : 'none';
+  prevBtn.disabled = lbIndex === 0;
+  nextBtn.disabled = lbIndex === lbImages.length - 1;
+  // 提示动画
+  var hint = lbOverlay.querySelector('.lightbox-hint');
+  if (hint) {
+    hint.style.opacity = '1';
+    setTimeout(function() { hint.style.opacity = '0'; }, 2000);
+  }
+}
+
+function applyTransform() {
+  var stage = lbOverlay.querySelector('.lightbox-img-wrap');
+  if (stage) {
+    stage.style.transform = 'translate(' + lbTranslateX + 'px, ' + lbTranslateY + 'px) scale(' + lbScale + ')';
+  }
+}
+
+function showZoomInfo() {
+  var info = lbOverlay.querySelector('.lightbox-zoom-info');
+  info.textContent = Math.round(lbScale * 100) + '%';
+  info.classList.add('show');
+  clearTimeout(lbZoomInfoTimer);
+  lbZoomInfoTimer = setTimeout(function() { info.classList.remove('show'); }, 800);
+}
+
+function navigateLightbox(dir) {
+  var newIdx = lbIndex + dir;
+  if (newIdx < 0 || newIdx >= lbImages.length) return;
+  lbIndex = newIdx;
+  renderLightbox();
+}
+
+function initLightboxDOM() {
+  if (document.getElementById('lightboxOverlay')) return;
+  var html = '<div class="lightbox-overlay" id="lightboxOverlay">' +
+    '<div class="lightbox-header">' +
+      '<button class="lightbox-btn lightbox-btn-close" id="lbClose" aria-label="关闭"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>' +
+      '<div class="lightbox-caption" id="lbCaption"></div>' +
+      '<div class="lightbox-counter" id="lbCounter"></div>' +
+    '</div>' +
+    '<div class="lightbox-stage" id="lbStage">' +
+      '<div class="lightbox-img-wrap" id="lbImgWrap"></div>' +
+    '</div>' +
+    '<button class="lightbox-nav prev" id="lbPrev">‹</button>' +
+    '<button class="lightbox-nav next" id="lbNext">›</button>' +
+    '<div class="lightbox-hint" id="lbHint">双击放大 · 双指缩放</div>' +
+    '<div class="lightbox-zoom-info" id="lbZoomInfo"></div>' +
+  '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  lbOverlay = document.getElementById('lightboxOverlay');
+
+  // 事件绑定
+  document.getElementById('lbClose').addEventListener('click', closeLightbox);
+  document.getElementById('lbPrev').addEventListener('click', function(e) { e.stopPropagation(); navigateLightbox(-1); });
+  document.getElementById('lbNext').addEventListener('click', function(e) { e.stopPropagation(); navigateLightbox(1); });
+
+  // 点击空白关闭（但仅在未缩放时）
+  document.getElementById('lbStage').addEventListener('click', function(e) {
+    if (lbScale <= 1 && e.target.tagName !== 'IMG') closeLightbox();
+  });
+
+  // 触摸手势
+  var stage = document.getElementById('lbStage');
+  stage.addEventListener('touchstart', handleTouchStart, { passive: false });
+  stage.addEventListener('touchmove', handleTouchMove, { passive: false });
+  stage.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+  // 鼠标滚轮缩放（桌面端）
+  stage.addEventListener('wheel', handleWheel, { passive: false });
+}
+
+// 触摸开始
+function handleTouchStart(e) {
+  if (e.touches.length === 2) {
+    // 双指缩放开始
+    e.preventDefault();
+    lbPinchStartDist = getDistance(e.touches[0], e.touches[1]);
+    lbPinchStartScale = lbScale;
+  } else if (e.touches.length === 1) {
+    // 单指拖拽 或 双击检测
+    var now = Date.now();
+    if (now - lbLastTapTime < 300) {
+      // 双击：切换缩放
+      e.preventDefault();
+      handleDoubleTap(e.touches[0].clientX, e.touches[0].clientY);
+      lbLastTapTime = 0;
+    } else {
+      lbLastTapTime = now;
+      lbIsDragging = true;
+      lbStartX = e.touches[0].clientX - lbTranslateX;
+      lbStartY = e.touches[0].clientY - lbTranslateY;
+      lbLastX = lbTranslateX;
+      lbLastY = lbTranslateY;
+    }
+  }
+}
+
+// 触摸移动
+function handleTouchMove(e) {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    var dist = getDistance(e.touches[0], e.touches[1]);
+    lbScale = Math.max(1, Math.min(5, lbPinchStartScale * (dist / lbPinchStartDist)));
+    applyTransform();
+    showZoomInfo();
+    if (lbScale === 1) { lbTranslateX = 0; lbTranslateY = 0; applyTransform(); }
+  } else if (e.touches.length === 1 && lbIsDragging && lbScale > 1) {
+    e.preventDefault();
+    lbTranslateX = e.touches[0].clientX - lbStartX;
+    lbTranslateY = e.touches[0].clientY - lbStartY;
+    applyTransform();
+  }
+}
+
+// 触摸结束
+function handleTouchEnd(e) {
+  lbIsDragging = false;
+  // 边界回弹：缩放到1时重置位移
+  if (lbScale <= 1.05) {
+    lbScale = 1; lbTranslateX = 0; lbTranslateY = 0;
+    applyTransform();
+  }
+  // 滑动切换（仅在未缩放时）
+  if (lbScale === 1 && e.changedTouches.length === 1) {
+    var dx = e.changedTouches[0].clientX - lbStartX;
+    var dy = e.changedTouches[0].clientY - lbStartY;
+    if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) navigateLightbox(1);
+      else navigateLightbox(-1);
+    }
+  }
+}
+
+// 鼠标滚轮缩放
+function handleWheel(e) {
+  e.preventDefault();
+  var delta = e.deltaY > 0 ? 0.9 : 1.1;
+  var newScale = Math.max(1, Math.min(5, lbScale * delta));
+  lbScale = newScale;
+  if (lbScale === 1) { lbTranslateX = 0; lbTranslateY = 0; }
+  applyTransform();
+  showZoomInfo();
+}
+
+// 双击切换缩放
+function handleDoubleTap(x, y) {
+  if (lbScale > 1) {
+    lbScale = 1; lbTranslateX = 0; lbTranslateY = 0;
+  } else {
+    lbScale = 2.5;
+    // 以点击位置为中心缩放
+    var rect = lbOverlay.getBoundingClientRect();
+    var centerX = rect.width / 2;
+    var centerY = rect.height / 2;
+    lbTranslateX = (centerX - x) * 1.5;
+    lbTranslateY = (centerY - y) * 1.5;
+  }
+  applyTransform();
+  showZoomInfo();
+}
+
+// 计算两点距离
+function getDistance(t1, t2) {
+  var dx = t1.clientX - t2.clientX;
+  var dy = t1.clientY - t2.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// 座位图点击放大
+function openSeatmapLightbox() {
+  var img = document.querySelector('#seatmapContainer img');
+  if (!img) return;
+  openLightbox([{ url: img.src, file_token: '' }], 0, '座位图');
+}
+
+// 视角图点击放大
+function openViewImageLightbox() {
+  var imgs = carouselMatches[carouselIndex] ? (carouselMatches[carouselIndex].fields['图片'] || []) : [];
+  if (imgs.length === 0) return;
+  var images = imgs.map(function(f) { return { file_token: f.file_token }; });
+  var caption = (currentVenue ? currentVenue.name : '') + ' · ' + (carouselMatches[carouselIndex].fields['区域'] || '');
+  openLightbox(images, carouselImgIndex, caption);
+}
+
+// 初始化 DOM
+initLightboxDOM();
 
 // ===== 初始化 =====
 // 立即渲染本地 Banner fallback
