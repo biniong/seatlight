@@ -582,6 +582,12 @@ const server = http.createServer(async (req, res) => {
 
     try {
       if (pathname === '/health' && req.method === 'GET') {
+        // 如果 token 过期但有 refreshToken，尝试刷新
+        const forceValid = !!(tokenState.userToken && Date.now() < tokenState.expiresAt - 60000);
+        if (!forceValid && tokenState.refreshToken) {
+          console.log('[Health] token 过期，触发刷新...');
+          await refreshTokenIfNeeded(true);
+        }
         const valid = !!(tokenState.userToken && Date.now() < tokenState.expiresAt - 60000);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, baseId: CONFIG.baseId, tableId: CONFIG.tableId, tokenValid: valid, user: tokenState.userName || '' }));
