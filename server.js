@@ -33,40 +33,38 @@ let appTokenExpiresAt = 0;
 
 function loadTokens() {
   try {
-    // 优先从环境变量读取（Railway Variables，跨部署持久化）
-    const envRefreshToken = process.env.FEISHU_REFRESH_TOKEN;
-    const envUserToken = process.env.FEISHU_USER_TOKEN;
-    if (envRefreshToken) {
-      tokenState.refreshToken = envRefreshToken;
-      tokenState.refreshExpiresAt = Date.now() + 30 * 24 * 3600 * 1000; // 30 天
-      console.log('[Token] ✅ 从环境变量加载 refresh_token');
-    }
-    if (envUserToken) {
-      tokenState.userToken = envUserToken;
-      tokenState.expiresAt = Date.now() + 2 * 3600 * 1000; // 2 小时
-      tokenState.userName = process.env.FEISHU_USER_NAME || 'Unknown';
-      console.log('[Token] ✅ 从环境变量加载 user_token, 用户:', tokenState.userName);
+    // 优先从持久化文件加载（Railway Volume，跨部署保留最新 token）
+    if (fs.existsSync(TOKEN_STORE)) {
+      const data = JSON.parse(fs.readFileSync(TOKEN_STORE, 'utf-8'));
+      if (data.userToken && data.expiresAt > Date.now()) {
+        tokenState.userToken = data.userToken;
+        tokenState.expiresAt = data.expiresAt;
+        tokenState.userName = data.userName || '';
+        console.log('[Token] ✅ 从文件加载 user_token，有效至', new Date(data.expiresAt).toISOString());
+      }
+      if (data.refreshToken) {
+        tokenState.refreshToken = data.refreshToken;
+        tokenState.refreshExpiresAt = data.refreshExpiresAt || Date.now() + 30 * 24 * 3600 * 1000;
+        console.log('[Token] ✅ 从文件加载 refresh_token');
+      }
     }
     
-    // 如果环境变量没有，尝试从文件加载
+    // 文件没有时，从环境变量兜底（仅在首次部署或文件丢失时触发）
     if (!tokenState.userToken || !tokenState.refreshToken) {
-      if (fs.existsSync(TOKEN_STORE)) {
-        const data = JSON.parse(fs.readFileSync(TOKEN_STORE, 'utf-8'));
-        if (!tokenState.userToken && data.userToken) {
-          tokenState.userToken = data.userToken;
-          tokenState.expiresAt = data.expiresAt || Date.now() + 2 * 3600 * 1000;
-          console.log('[Token] 从文件加载 user_token');
-        }
-        if (!tokenState.refreshToken && data.refreshToken) {
-          tokenState.refreshToken = data.refreshToken;
-          tokenState.refreshExpiresAt = data.refreshExpiresAt || Date.now() + 30 * 24 * 3600 * 1000;
-          console.log('[Token] 从文件加载 refresh_token');
-        }
-        if (data.userName && !tokenState.userName) {
-          tokenState.userName = data.userName;
-        }
-      } else {
-        console.log('[Token] 无 token 文件');
+      const envRefreshToken = process.env.FEISHU_REFRESH_TOKEN;
+      const envUserToken = process.env.FEISHU_USER_TOKEN;
+      if (envRefreshToken && !tokenState.refreshToken) {
+        tokenState.refreshToken = envRefreshToken;
+        tokenState.refreshExpiresAt = Date.now() + 30 * 24 * 3600 * 1000;
+        console.log('[Token] 从环境变量兜底加载 refresh_token');
+      }
+      if (envUserToken && !tokenState.userToken) {
+        tokenState.userToken = envUserToken;
+        tokenState.expiresAt = Date.now() + 2 * 3600 * 1000;
+        tokenState.userName = process.env.FEISHU_USER_NAME || '';
+        console.log('[Token] 从环境变量兜底加载 user_token');
+        // 立即写入文件，避免下次重启又从环境变量加载过期 token
+        saveTokens();
       }
     }
     
